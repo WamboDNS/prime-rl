@@ -2,7 +2,7 @@
 trainer_gpu_ids = [0]
 inference_gpu_ids = [1]
 
-max_steps = 100
+max_steps = 50
 seq_len = 2048
 
 [wandb]
@@ -15,8 +15,6 @@ name = "Qwen/Qwen3-4B-Instruct-2507"
 [orchestrator]
 batch_size = 32
 rollouts_per_example = 8
-oversampling_factor = 2.0
-max_async_level = 2
 
 [orchestrator.sampling]
 max_tokens = 4096
@@ -25,9 +23,6 @@ max_tokens = 4096
 id = "wambosec/injection-detector"
 name = "injection-detector"
 args = { dataset_name = "wambosec/prompt-injections-subtle" }
-
-[trainer]
-max_async_level = 2
 
 [trainer.model.lora]
 rank = 16

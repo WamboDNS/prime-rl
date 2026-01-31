@@ -7,7 +7,7 @@ seq_len = 2048
 
 [wandb]
 project = "injection-detector"
-name = "injection-detector-window-20-30"
+name = "injection-detector-filtering-20-30"
 
 [model]
 name = "Qwen/Qwen3-4B-Instruct-2507"

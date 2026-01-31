@@ -26,11 +26,6 @@ id = "wambosec/injection-detector"
 name = "injection-detector"
 args = { dataset_name = "wambosec/prompt-injections-subtle" }
 
-[orchestrator.val]
-num_examples = 16
-rollouts_per_example = 8
-interval = 1
-
 [trainer]
 max_async_level = 2
 

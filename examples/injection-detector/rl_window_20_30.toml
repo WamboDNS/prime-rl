@@ -37,11 +37,6 @@ pool_assignment_end_step = 30
 easy_fraction = 0.2
 hard_fraction = 0.2
 
-[orchestrator.val]
-num_examples = 16
-rollouts_per_example = 8
-interval = 1
-
 [trainer]
 max_async_level = 2
 

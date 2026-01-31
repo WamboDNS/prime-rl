@@ -54,7 +54,4 @@ args = { dataset_name = "wambosec/prompt-injections-subtle" }
 [trainer]
 max_async_level = 2
 
-[trainer.model.ac]
-freq = 1
-
 [inference]

@@ -13,7 +13,7 @@ name = "injection-detector-window-20-30"
 name = "Qwen/Qwen3-4B-Instruct-2507"
 
 [orchestrator]
-batch_size = 16
+batch_size = 32
 rollouts_per_example = 8
 oversampling_factor = 2.0
 max_async_level = 2
@@ -36,20 +36,6 @@ pool_assignment_start_step = 20
 pool_assignment_end_step = 30
 easy_fraction = 0.2
 hard_fraction = 0.2
-
-[orchestrator.val]
-num_examples = 32
-rollouts_per_example = 4
-interval = 5
-
-[orchestrator.eval]
-interval = 20
-num_examples = 100
-rollouts_per_example = 1
-
-[[orchestrator.eval.env]]
-id = "wambosec/injection-detector"
-args = { dataset_name = "wambosec/prompt-injections-subtle" }
 
 [trainer]
 max_async_level = 2

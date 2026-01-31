@@ -43,4 +43,8 @@ args = { dataset_name = "wambosec/prompt-injections-subtle" }
 [trainer]
 max_async_level = 2
 
+[trainer.model.lora]
+rank = 16
+alpha = 32
+
 [inference]

@@ -28,7 +28,7 @@ args = { dataset_name = "wambosec/prompt-injections-subtle" }
 [orchestrator.buffer]
 online_difficulty_filtering = true
 easy_threshold = 0.8
-hard_threshold = 0.2
+hard_threshold = 0.5
 easy_fraction = 0.2
 hard_fraction = 0.2
 

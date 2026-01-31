@@ -1,0 +1,45 @@
+# No difficulty filtering - all rollouts kept
+trainer_gpu_ids = [0]
+inference_gpu_ids = [1]
+
+max_steps = 100
+seq_len = 4096
+
+[wandb]
+project = "injection-detector"
+name = "injection-detector-no-filtering"
+
+[model]
+name = "Qwen/Qwen3-4B-Instruct-2507"
+
+[orchestrator]
+batch_size = 32
+rollouts_per_example = 16
+oversampling_factor = 2.0
+max_async_level = 2
+
+[orchestrator.sampling]
+max_tokens = 4096
+
+[[orchestrator.env]]
+id = "wambosec/injection-detector"
+name = "injection-detector"
+args = { dataset_name = "wambosec/prompt-injections-subtle" }
+
+[orchestrator.val]
+num_examples = 32
+rollouts_per_example = 4
+interval = 5
+
+[orchestrator.eval]
+interval = 20
+num_examples = 100
+rollouts_per_example = 1
+
+[[orchestrator.eval.env]]
+id = "wambosec/injection-detector"
+args = { dataset_name = "wambosec/prompt-injections-subtle" }
+
+[trainer]
+
+[inference]

@@ -47,5 +47,6 @@ id = "wambosec/injection-detector"
 args = { dataset_name = "wambosec/prompt-injections-subtle" }
 
 [trainer]
+max_async_level = 2
 
 [inference]

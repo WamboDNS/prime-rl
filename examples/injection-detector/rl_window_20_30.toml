@@ -3,7 +3,7 @@ trainer_gpu_ids = [0]
 inference_gpu_ids = [1]
 
 max_steps = 100
-seq_len = 4096
+seq_len = 2048
 
 [wandb]
 project = "injection-detector"
@@ -53,5 +53,8 @@ args = { dataset_name = "wambosec/prompt-injections-subtle" }
 
 [trainer]
 max_async_level = 2
+
+[trainer.model.ac]
+freq = 1
 
 [inference]

@@ -211,8 +211,41 @@ class Buffer:
 
         return sampled_examples
 
-    def update(self, rollouts: list[vf.State]):
+    def _is_step_in_window(self, step: int | None, start: int | None, end: int | None) -> bool:
+        """Check if the given step is within [start, end) window."""
+        if step is None:
+            return True
+        if start is not None and step < start:
+            return False
+        if end is not None and step >= end:
+            return False
+        return True
+
+    def _is_rollout_filtering_active(self, step: int | None) -> bool:
+        """Check if online difficulty filtering is active for the given step."""
+        if not self.config.online_difficulty_filtering:
+            return False
+        return self._is_step_in_window(
+            step,
+            self.config.online_difficulty_filtering_start_step,
+            self.config.online_difficulty_filtering_end_step,
+        )
+
+    def _is_pool_assignment_active(self, step: int | None) -> bool:
+        """Check if pool assignment is active for the given step."""
+        if self.config.easy_threshold is None and self.config.hard_threshold is None:
+            return False
+        return self._is_step_in_window(
+            step,
+            self.config.pool_assignment_start_step,
+            self.config.pool_assignment_end_step,
+        )
+
+    def update(self, rollouts: list[vf.State], step: int | None = None):
         """Updates the buffer state with completed rollouts."""
+
+        rollout_filtering_active = self._is_rollout_filtering_active(step)
+        pool_assignment_active = self._is_pool_assignment_active(step)
 
         rollouts_by_example = defaultdict(list)
         for rollout in rollouts:
@@ -222,12 +255,13 @@ class Buffer:
             avg_reward = mean([r["reward"] for r in example_rollouts])
             env_name = example_rollouts[0]["task"]
 
-            if self.config.easy_threshold is not None and avg_reward >= self.config.easy_threshold:
-                pool = "easy"
-            elif self.config.hard_threshold is not None and avg_reward <= self.config.hard_threshold:
-                pool = "hard"
-            else:
-                pool = "normal"
+            # Pool assignment (controlled by its own step window)
+            pool = "normal"
+            if pool_assignment_active:
+                if self.config.easy_threshold is not None and avg_reward >= self.config.easy_threshold:
+                    pool = "easy"
+                elif self.config.hard_threshold is not None and avg_reward <= self.config.hard_threshold:
+                    pool = "hard"
 
             if pool != "normal" and example_id in self.example_buffer[env_name]:
                 example = self.example_buffer[env_name].pop(example_id)
@@ -235,7 +269,9 @@ class Buffer:
                 target_pool.append(example)
 
             self.num_examples_per_step[env_name][pool] += 1
-            if self.config.online_difficulty_filtering:
+
+            # Rollout filtering (controlled by its own step window)
+            if rollout_filtering_active:
                 if avg_reward == 0.0:
                     self.num_rollouts_per_step[env_name]["hard"] += len(example_rollouts)
                     continue

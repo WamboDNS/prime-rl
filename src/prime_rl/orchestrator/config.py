@@ -550,6 +550,38 @@ class BufferConfig(BaseConfig):
         ),
     ] = False
 
+    online_difficulty_filtering_start_step: Annotated[
+        int | None,
+        Field(
+            ge=0,
+            description="Step at which to start online difficulty filtering (rollout filtering). If None, filtering starts from step 0. Only used when online_difficulty_filtering=True.",
+        ),
+    ] = None
+
+    online_difficulty_filtering_end_step: Annotated[
+        int | None,
+        Field(
+            ge=0,
+            description="Step at which to stop online difficulty filtering (exclusive). If None, filtering continues until training ends. Only used when online_difficulty_filtering=True.",
+        ),
+    ] = None
+
+    pool_assignment_start_step: Annotated[
+        int | None,
+        Field(
+            ge=0,
+            description="Step at which to start pool assignment (moving examples to easy/hard pools). If None, pool assignment starts from step 0. Only used when easy_threshold or hard_threshold is set.",
+        ),
+    ] = None
+
+    pool_assignment_end_step: Annotated[
+        int | None,
+        Field(
+            ge=0,
+            description="Step at which to stop pool assignment (exclusive). If None, pool assignment continues until training ends. Only used when easy_threshold or hard_threshold is set.",
+        ),
+    ] = None
+
     hash_keys: Annotated[
         list[str],
         Field(
@@ -579,6 +611,28 @@ class BufferConfig(BaseConfig):
     def validate_env_ratios(self):
         if self.env_ratios is not None:
             assert all(ratio > 0 for ratio in self.env_ratios), "All env_ratios must be positive."
+        return self
+
+    @model_validator(mode="after")
+    def validate_filtering_step_range(self):
+        start = self.online_difficulty_filtering_start_step
+        end = self.online_difficulty_filtering_end_step
+        if start is not None and end is not None and start >= end:
+            raise ValueError(
+                f"online_difficulty_filtering_start_step ({start}) must be less than "
+                f"online_difficulty_filtering_end_step ({end})."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_pool_assignment_step_range(self):
+        start = self.pool_assignment_start_step
+        end = self.pool_assignment_end_step
+        if start is not None and end is not None and start >= end:
+            raise ValueError(
+                f"pool_assignment_start_step ({start}) must be less than "
+                f"pool_assignment_end_step ({end})."
+            )
         return self
 
     @model_validator(mode="after")

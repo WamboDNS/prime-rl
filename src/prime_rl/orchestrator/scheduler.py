@@ -310,7 +310,7 @@ class Scheduler:
                     group_results: list[dict] = finished_future.result()
 
                     # Update buffer with results
-                    self.buffer.update(group_results)
+                    self.buffer.update(group_results, step=self.step)
                     accepted_rollouts = self.buffer.sample_rollouts(n=self.config.rollouts_per_example)
 
                     batch_rollouts.extend(accepted_rollouts)

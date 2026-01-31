@@ -208,3 +208,98 @@ def test_buffer_no_cross_env_pool_assignment(mock_openai_client, tmp_path):
     assert len(new_buffer.easy_examples) == 0
     # Should still be in normal pool for env_b
     assert len(new_buffer.example_buffer["env_b"]) == 1
+
+
+def test_buffer_rollout_filtering_step_window(dummy_env_group, make_rollouts):
+    """Rollout filtering only active within [start_step, end_step) window."""
+    dataset = dummy_env_group.get_dataset()
+    buffer = Buffer(
+        dataset,
+        dummy_env_group.env_names,
+        BufferConfig(
+            online_difficulty_filtering=True,
+            online_difficulty_filtering_start_step=5,
+            online_difficulty_filtering_end_step=15,
+        ),
+    )
+
+    # Before window: all rollouts kept
+    buffer.update(make_rollouts(dataset.select(range(2)), rewards=[1.0, 0.0]), step=3)
+    assert len(buffer.rollout_buffer) == 4
+
+    # Inside window: filtering active (1.0 filtered out)
+    buffer.update(make_rollouts(dataset.select(range(2, 4)), rewards=[1.0, 0.5]), step=10)
+    assert len(buffer.rollout_buffer) == 4 + 2
+
+    # After window: all rollouts kept
+    buffer.update(make_rollouts(dataset.select(range(4, 6)), rewards=[0.0, 1.0]), step=15)
+    assert len(buffer.rollout_buffer) == 4 + 2 + 4
+
+
+def test_buffer_pool_assignment_step_window(dummy_env_group, make_rollouts):
+    """Pool assignment and rollout filtering have independent step windows."""
+    dataset = dummy_env_group.get_dataset()
+    buffer = Buffer(
+        dataset,
+        dummy_env_group.env_names,
+        BufferConfig(
+            online_difficulty_filtering=True,
+            online_difficulty_filtering_start_step=10,
+            online_difficulty_filtering_end_step=20,
+            easy_threshold=1.0,
+            hard_threshold=0.0,
+            pool_assignment_start_step=5,
+            pool_assignment_end_step=15,
+        ),
+    )
+
+    # Step 7: pool assignment active, rollout filtering inactive
+    buffer.update(make_rollouts(dataset.select(range(2)), rewards=[1.0, 0.0]), step=7)
+    assert len(buffer.easy_examples) == 1
+    assert len(buffer.rollout_buffer) == 4  # no filtering
+
+    # Step 12: both active
+    buffer.update(make_rollouts(dataset.select(range(2, 4)), rewards=[1.0, 0.5]), step=12)
+    assert len(buffer.easy_examples) == 2
+    assert len(buffer.rollout_buffer) == 4 + 2  # 1.0 filtered
+
+    # Step 17: pool assignment inactive, rollout filtering active
+    buffer.update(make_rollouts(dataset.select(range(4, 6)), rewards=[1.0, 0.0]), step=17)
+    assert len(buffer.easy_examples) == 2  # unchanged
+    assert len(buffer.rollout_buffer) == 4 + 2 + 0  # both filtered
+
+
+def test_buffer_rollout_filtering_step_range_validation():
+    """Config validates that start_step < end_step for rollout filtering."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="online_difficulty_filtering_start_step.*must be less than"):
+        BufferConfig(
+            online_difficulty_filtering_start_step=10,
+            online_difficulty_filtering_end_step=5,
+        )
+
+
+def test_buffer_pool_assignment_step_range_validation():
+    """Config validates that start_step < end_step for pool assignment."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="pool_assignment_start_step.*must be less than"):
+        BufferConfig(
+            pool_assignment_start_step=10,
+            pool_assignment_end_step=5,
+        )
+
+
+def test_buffer_filtering_without_step_uses_config(dummy_env_group, make_rollouts):
+    """When step=None is passed, filtering uses config setting directly."""
+    dataset = dummy_env_group.get_dataset()
+    buffer = Buffer(
+        dataset,
+        dummy_env_group.env_names,
+        BufferConfig(online_difficulty_filtering=True),
+    )
+
+    # step=None should still filter (backwards compatibility)
+    buffer.update(make_rollouts(dataset.select(range(3)), rewards=[1.0, 0.0, 0.5]))
+    assert len(buffer.rollout_buffer) == 2  # Only reward 0.5

@@ -75,13 +75,37 @@ class SinglePacker(BasePacker):
 
         self.multi_run_manager.ready_to_update[0] = True
         self.multi_run_manager.progress[0].step += 1
+
+        # Check for multi-agent samples (samples with lora_id set)
+        # This enables multi-LoRA training within a single run
+        lora_ids = [sample.lora_id for sample in batch.examples]
+        has_multi_agent = any(lid is not None for lid in lora_ids)
+
+        if has_multi_agent:
+            # Multi-agent: route each sample to its specified LoRA adapter
+            idxs = [lid if lid is not None else 0 for lid in lora_ids]
+            max_lora_id = max(idxs)
+
+            # Validate that max_runs is configured with enough LoRA adapters
+            if max_lora_id >= self.multi_run_manager.max_runs:
+                raise ValueError(
+                    f"Multi-agent sample has lora_id={max_lora_id} but trainer only has "
+                    f"{self.multi_run_manager.max_runs} LoRA adapter(s). "
+                    f"Set max_runs >= {max_lora_id + 1} in trainer config for multi-agent training."
+                )
+            num_loras = self.multi_run_manager.max_runs
+        else:
+            # Standard single-adapter mode
+            idxs = [0] * len(batch.examples)
+            num_loras = self.multi_run_manager.max_runs
+
         micro_batch_grid = prepare_batch(
             rollouts=batch.examples,
             seq_len=self.seq_len,
             pad_to_multiple_of=self.pad_to_multiple_of,
             num_train_workers=self.dp_world_size,
-            idxs=[0] * len(batch.examples),
-            num_loras=self.multi_run_manager.max_runs,
+            idxs=idxs,
+            num_loras=num_loras,
         )
 
         self.sender.send(micro_batch_grid)

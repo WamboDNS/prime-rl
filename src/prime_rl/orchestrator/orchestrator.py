@@ -8,7 +8,13 @@ import tomli_w
 from prime_rl.orchestrator.advantage import compute_advantages
 from prime_rl.orchestrator.event_loop_lag import EventLoopLagMonitor
 from prime_rl.orchestrator.patches import monkey_patch_chat_completion_logprobs, monkey_patch_oai_iterable_types
-from prime_rl.orchestrator.trajectories import branch_rollout, build_vlm_image_cache, interleave_rollout
+from prime_rl.orchestrator.trajectories import (
+    branch_rollout,
+    build_vlm_image_cache,
+    interleave_rollout,
+    is_multi_agent_state,
+    process_multi_agent_rollout,
+)
 from prime_rl.transport import TrainingBatch, TrainingSample, setup_training_batch_sender
 
 # This monkey patch is necessary to avoid Pydantic validating fields using typing.Iterable (e.g. in multimodal or tool call messages) lazily which leads to tokenization errors, for more info see https://github.com/PrimeIntellect-ai/prime-rl/pull/1249
@@ -394,6 +400,9 @@ async def orchestrate(config: OrchestratorConfig):
 
         num_unique_examples = len({r["example_id"] for r in train_rollouts})
 
+        # Detect multi-agent environment (check first rollout)
+        is_multi_agent = train_rollouts and is_multi_agent_state(train_rollouts[0])
+
         # VLM: build image cache for efficient batched preprocessing
         if is_vlm:
             vlm_cache = build_vlm_image_cache(train_rollouts, processor)
@@ -404,7 +413,12 @@ async def orchestrate(config: OrchestratorConfig):
             vlm_cache = None
 
         # Process rollouts in parallel
-        if config.trajectory_strategy == "interleaved":
+        if is_multi_agent:
+
+            def process_rollout(rollout: vf.State, rollout_idx: int) -> list[TrainingSample] | None:
+                return process_multi_agent_rollout(rollout, vlm_cache=vlm_cache, cache_key=rollout_idx)
+
+        elif config.trajectory_strategy == "interleaved":
 
             def process_rollout(rollout: vf.State) -> list[TrainingSample] | None:
                 return interleave_rollout(rollout)
@@ -414,7 +428,7 @@ async def orchestrate(config: OrchestratorConfig):
                 return branch_rollout(rollout, vlm_cache=vlm_cache, cache_key=rollout_idx)
 
         loop = asyncio.get_event_loop()
-        if config.trajectory_strategy == "interleaved":
+        if config.trajectory_strategy == "interleaved" and not is_multi_agent:
             futures = [loop.run_in_executor(rollout_executor, process_rollout, r) for r in train_rollouts]
         else:
             futures = [

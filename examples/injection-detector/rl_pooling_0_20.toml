@@ -1,0 +1,44 @@
+# Pooling enabled for first 20 steps only, no difficulty filtering
+trainer_gpu_ids = [0]
+inference_gpu_ids = [1]
+
+max_steps = 50
+seq_len = 2048
+
+[wandb]
+project = "injection-detector"
+name = "injection-detector-pooling-0-20"
+
+[model]
+name = "Qwen/Qwen3-4B-Instruct-2507"
+
+[orchestrator]
+batch_size = 32
+rollouts_per_example = 16
+oversampling_factor = 2.0
+max_async_level = 2
+
+[orchestrator.sampling]
+max_tokens = 4096
+
+[[orchestrator.env]]
+id = "wambosec/injection-detector"
+name = "injection-detector"
+args = { dataset_name = "wambosec/prompt-injections-subtle" }
+
+[orchestrator.buffer]
+online_difficulty_filtering = false
+easy_threshold = 0.8
+hard_threshold = 0.5
+pool_assignment_end_step = 20
+easy_fraction = 0.2
+hard_fraction = 0.2
+
+[trainer]
+max_async_level = 2
+
+[trainer.model.lora]
+rank = 16
+alpha = 32
+
+[inference]

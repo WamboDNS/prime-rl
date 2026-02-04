@@ -80,7 +80,7 @@ def extract_result(output: vf.RolloutOutput, temperature: float) -> dict:
         }
         trajectory.append(traj_step)
 
-    return {
+    result = {
         # Required by buffer
         "example_id": output.get("example_id"),
         "task": output.get("task"),
@@ -95,6 +95,22 @@ def extract_result(output: vf.RolloutOutput, temperature: float) -> dict:
         "completion": output.get("completion"),
         "trajectory": trajectory,
     }
+
+    agent_rollouts = output.get("agent_rollouts")
+    if agent_rollouts:
+        enriched_rollouts = []
+        for rollout in agent_rollouts:
+            steps = []
+            for step in rollout.get("steps", []):
+                step_copy = dict(step)
+                step_copy["temperature"] = temperature
+                steps.append(step_copy)
+            rollout_copy = dict(rollout)
+            rollout_copy["steps"] = steps
+            enriched_rollouts.append(rollout_copy)
+        result["agent_rollouts"] = enriched_rollouts
+
+    return result
 
 
 async def worker_loop(
@@ -147,7 +163,7 @@ async def worker_loop(
                 client=client,
                 model=request.model_name,
                 sampling_args=request.sampling_args,  # Use per-request sampling args for temp scheduling
-                state_columns=["trajectory"],
+                state_columns=["trajectory", "agent_rollouts"],
             )
         temperature = request.sampling_args["temperature"]
         return RolloutResponse(request_id=request.request_id, results=[extract_result(o, temperature) for o in outputs])

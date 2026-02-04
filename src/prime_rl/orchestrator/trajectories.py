@@ -341,6 +341,8 @@ def build_vlm_image_cache(rollouts: list[vf.State], processor) -> VLMImageCache:
 
 def process_multi_agent_rollout(
     state: vf.State,
+    agent_rewards: dict[str, float] | None = None,
+    agent_advantages: dict[str, float] | None = None,
     vlm_cache: "VLMImageCache | None" = None,
     cache_key: int | None = None,
 ) -> list[TrainingSample] | None:
@@ -352,6 +354,8 @@ def process_multi_agent_rollout(
 
     Args:
         state: vf.State containing agent_rollouts from MultiAgentEnv
+        agent_rewards: Per-agent total rewards for this rollout
+        agent_advantages: Per-agent advantages for this rollout
         vlm_cache: Pre-computed VLM image cache for multimodal training
         cache_key: Cache key to use when retrieving images from the VLM cache
 
@@ -372,9 +376,16 @@ def process_multi_agent_rollout(
         meta = agent_rollout.get("meta", {})
         trainable = meta.get("trainable", True)
         lora_id = meta.get("lora_id")
+        agent_id = meta.get("agent_id")
 
         if not trainable:
             continue
+        if not agent_id:
+            raise ValueError("agent_rollout meta missing agent_id")
+        if agent_rewards is None or agent_id not in agent_rewards:
+            raise ValueError(f"Missing reward for agent {agent_id!r}")
+        if agent_advantages is None or agent_id not in agent_advantages:
+            raise ValueError(f"Missing advantage for agent {agent_id!r}")
 
         steps = agent_rollout.get("steps", [])
         for step_idx, step in enumerate(steps):
@@ -405,7 +416,8 @@ def process_multi_agent_rollout(
                 completion_logprobs=list(tokens["completion_logprobs"]),
                 completion_temperatures=[temperature] * len(completion_ids),
                 teacher_logprobs=None,
-                advantage=None,
+                advantage=agent_advantages[agent_id],
+                reward=agent_rewards[agent_id],
                 lora_id=lora_id,
                 pixel_values=pixel_values,
                 image_grid_thw=image_grid_thw,

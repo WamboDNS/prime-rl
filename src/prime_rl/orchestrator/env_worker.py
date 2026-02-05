@@ -6,6 +6,7 @@ Runs environment rollouts in a separate process to isolate event loop lag.
 
 import asyncio
 import queue
+import time
 import uuid
 from dataclasses import dataclass
 from itertools import cycle
@@ -21,6 +22,20 @@ from prime_rl.utils.client import setup_clients
 from prime_rl.utils.config import ClientConfig
 from prime_rl.utils.elastic import ServerDiscovery
 from prime_rl.utils.logger import get_logger, intercept_verifiers_logging, reset_logger, setup_logger
+
+
+def _intercept_env_logging(level: str = "DEBUG"):
+    """Intercept environment-specific stdlib loggers (outside the verifiers hierarchy)."""
+    import logging
+
+    from prime_rl.utils.logger import _VerifiersInterceptHandler
+
+    # Intercept the root logger for any environment modules not under 'verifiers.*'
+    # This captures loggers like 'multi_agent_injection', etc.
+    root = logging.getLogger()
+    handler = _VerifiersInterceptHandler()
+    root.addHandler(handler)
+    root.setLevel(level.upper())
 
 
 class WorkerDiedError(Exception):
@@ -67,9 +82,13 @@ def extract_result(output: vf.RolloutOutput, temperature: float) -> dict:
         state: The vf.State from the environment rollout
         temperature: The temperature used during generation (from sampling args)
     """
+    logger = get_logger()
+    example_id = output.get("example_id")
+    logger.debug(f"[extract_result] example_id={example_id} reward={output.get('reward')} error={output.get('error')}")
+
     # Get trajectory with tokens (needed for training)
     trajectory = []
-    for step in output.get("trajectory", []):
+    for i, step in enumerate(output.get("trajectory", [])):
         traj_step = {
             "prompt": step.get("prompt"),
             "completion": step.get("completion"),
@@ -79,11 +98,13 @@ def extract_result(output: vf.RolloutOutput, temperature: float) -> dict:
             "tokens": step.get("tokens"),
             "temperature": temperature,  # Store temperature per-turn for per-token temp support
         }
+        has_tokens = step.get("tokens") is not None
+        logger.debug(f"[extract_result] example_id={example_id} trajectory step {i}: has_tokens={has_tokens}")
         trajectory.append(traj_step)
 
     result = {
         # Required by buffer
-        "example_id": output.get("example_id"),
+        "example_id": example_id,
         "task": output.get("task"),
         "reward": output.get("reward"),
         # Required by orchestrator metrics
@@ -99,17 +120,50 @@ def extract_result(output: vf.RolloutOutput, temperature: float) -> dict:
 
     agent_rollouts = output.get("agent_rollouts")
     if agent_rollouts:
+        logger.debug(f"[extract_result] example_id={example_id} processing {len(agent_rollouts)} agent_rollouts")
         enriched_rollouts = []
         for rollout in agent_rollouts:
+            meta = rollout.get("meta", {})
+            agent_id = meta.get("agent_id", "?")
+            raw_steps = rollout.get("steps", [])
+            logger.debug(
+                f"[extract_result] example_id={example_id} agent={agent_id} "
+                f"trainable={meta.get('trainable')} lora_id={meta.get('lora_id')} "
+                f"steps={len(raw_steps)} total_reward={rollout.get('total_reward')}"
+            )
             steps = []
-            for step in rollout.get("steps", []):
-                step_copy = dict(step)
-                step_copy["temperature"] = temperature
+            for j, step in enumerate(raw_steps):
+                # Only copy the fields we need - avoid copying 'response'
+                # which contains unpicklable Pydantic objects (ModdedChatCompletion)
+                step_copy = {
+                    "prompt": step.get("prompt"),
+                    "completion": step.get("completion"),
+                    "tokens": step.get("tokens"),
+                    "reward": step.get("reward"),
+                    "advantage": step.get("advantage"),
+                    "is_truncated": step.get("is_truncated"),
+                    "trajectory_id": step.get("trajectory_id"),
+                    "extras": step.get("extras"),
+                    "temperature": temperature,
+                }
+                has_tokens = step.get("tokens") is not None
+                logger.debug(
+                    f"[extract_result] example_id={example_id} agent={agent_id} "
+                    f"step {j}: has_tokens={has_tokens} is_truncated={step.get('is_truncated')}"
+                )
                 steps.append(step_copy)
-            rollout_copy = dict(rollout)
-            rollout_copy["steps"] = steps
+            rollout_copy = {
+                "id": rollout.get("id"),
+                "agent_id": rollout.get("agent_id"),
+                "steps": steps,
+                "completion": rollout.get("completion"),
+                "is_truncated": rollout.get("is_truncated"),
+                "total_reward": rollout.get("total_reward"),
+                "meta": meta,
+            }
             enriched_rollouts.append(rollout_copy)
         result["agent_rollouts"] = enriched_rollouts
+        logger.debug(f"[extract_result] example_id={example_id} agent_rollouts extracted successfully")
 
     return result
 
@@ -158,20 +212,49 @@ async def worker_loop(
         return bool(clients)
 
     async def process_request(request: RolloutRequest, client: AsyncOpenAI) -> RolloutResponse:
+        logger = get_logger()
+        logger.info(
+            f"[process_request] START example_id={request.example_id} "
+            f"rollouts={request.rollouts_per_example} model={request.model_name} "
+            f"temp={request.sampling_args.get('temperature')}"
+        )
+        t_start = time.perf_counter()
         if rate_limiter:
             await rate_limiter.acquire()
         example = example_lookup[request.example_id]
         group_inputs = [vf.RolloutInput(**example) for _ in range(request.rollouts_per_example)]
         async with semaphore:
+            t_run_start = time.perf_counter()
+            logger.debug(f"[process_request] example_id={request.example_id} acquired semaphore, calling run_group")
             outputs = await env.run_group(
                 group_inputs=group_inputs,
                 client=client,
                 model=request.model_name,
-                sampling_args=request.sampling_args,  # Use per-request sampling args for temp scheduling
+                sampling_args=request.sampling_args,
                 state_columns=["trajectory", "agent_rollouts"],
             )
+            t_run_end = time.perf_counter()
+            logger.info(
+                f"[process_request] example_id={request.example_id} run_group done in {t_run_end - t_run_start:.2f}s, "
+                f"got {len(outputs)} outputs"
+            )
         temperature = request.sampling_args["temperature"]
-        return RolloutResponse(request_id=request.request_id, results=[extract_result(o, temperature) for o in outputs])
+        results = []
+        for i, o in enumerate(outputs):
+            has_agent_rollouts = "agent_rollouts" in o and o["agent_rollouts"] is not None
+            logger.debug(
+                f"[process_request] example_id={request.example_id} output[{i}]: "
+                f"reward={o.get('reward')} error={o.get('error')} "
+                f"has_agent_rollouts={has_agent_rollouts} "
+                f"traj_len={len(o.get('trajectory', []))}"
+            )
+            results.append(extract_result(o, temperature))
+        t_end = time.perf_counter()
+        logger.info(
+            f"[process_request] DONE example_id={request.example_id} "
+            f"total={t_end - t_start:.2f}s results={len(results)}"
+        )
+        return RolloutResponse(request_id=request.request_id, results=results)
 
     try:
         while True:
@@ -214,10 +297,21 @@ async def worker_loop(
             done, _ = await asyncio.wait(pending_tasks.keys(), timeout=0.1, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
                 pending_tasks.pop(task)
+                if task.exception():
+                    logger = get_logger()
+                    logger.error(f"[worker_loop] task failed with exception: {task.exception()}")
+                    continue
                 response = task.result()
                 # Attach lag metrics to response
                 response.lag_metrics = lag_monitor.get_metrics()
+                logger = get_logger()
+                num_results = len(response.results) if response.results else 0
+                logger.info(
+                    f"[worker_loop] putting response on queue: request_id={response.request_id} "
+                    f"num_results={num_results}"
+                )
                 response_queue.put(response)
+                logger.debug(f"[worker_loop] response queued successfully: request_id={response.request_id}")
     finally:
         # Cleanup
         lag_monitor_task.cancel()
@@ -254,6 +348,8 @@ def worker_main(
         reset_logger()
         setup_logger(log_level, log_file=Path(log_file), append=True, tag=worker_name, json_logging=json_logging)
         intercept_verifiers_logging(level=vf_log_level)
+        # Also intercept environment-specific loggers (e.g. multi_agent_injection)
+        _intercept_env_logging(vf_log_level)
 
     # Load environment
     env = vf.load_environment(env_id, **env_args)
@@ -427,13 +523,23 @@ class EnvWorker:
     async def collect_responses(self):
         """Background task to collect responses and resolve futures."""
         logger = get_logger()
+        responses_received = 0
         while True:
             # Drain queue first to salvage any responses before checking for dead worker
+            drained = 0
             while True:
                 try:
                     response: RolloutResponse = self.response_queue.get_nowait()
                 except queue.Empty:
                     break
+                drained += 1
+                responses_received += 1
+                num_results = len(response.results) if response.results else 0
+                logger.info(
+                    f"[collect_responses] worker={self.worker_name} received response "
+                    f"request_id={response.request_id} num_results={num_results} "
+                    f"total_received={responses_received} pending={len(self.pending_futures)}"
+                )
                 # Store latest lag metrics from worker
                 if response.lag_metrics:
                     self.latest_lag_metrics = response.lag_metrics
@@ -442,14 +548,25 @@ class EnvWorker:
                     # Check if future was cancelled (e.g., by update_policy)
                     if not future.done():
                         future.set_result(response.results)
-                    # Track successful responses; reset restart count after stable operation
-                    self._responses_since_restart += 1
-                    if self._responses_since_restart >= 10 and self._restart_count > 0:
                         logger.debug(
-                            f"Worker '{self.worker_name}' stable after {self._responses_since_restart} responses, resetting restart count"
+                            f"[collect_responses] resolved future for request_id={response.request_id}"
                         )
-                        self._restart_count = 0
-                        self._responses_since_restart = 0
+                    else:
+                        logger.warning(
+                            f"[collect_responses] future already done for request_id={response.request_id}"
+                        )
+                else:
+                    logger.warning(
+                        f"[collect_responses] no pending future for request_id={response.request_id}"
+                    )
+                # Track successful responses; reset restart count after stable operation
+                self._responses_since_restart += 1
+                if self._responses_since_restart >= 10 and self._restart_count > 0:
+                    logger.debug(
+                        f"Worker '{self.worker_name}' stable after {self._responses_since_restart} responses, resetting restart count"
+                    )
+                    self._restart_count = 0
+                    self._responses_since_restart = 0
 
             # Check if worker process died unexpectedly (but not during intentional shutdown)
             if self.process and not self.process.is_alive() and not self._stopping:

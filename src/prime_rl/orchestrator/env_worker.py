@@ -119,7 +119,7 @@ def extract_result(output: vf.RolloutOutput, temperature: float) -> dict:
     }
 
     agent_rollouts = output.get("agent_rollouts")
-    if agent_rollouts:
+    if agent_rollouts is not None:
         logger.debug(f"[extract_result] example_id={example_id} processing {len(agent_rollouts)} agent_rollouts")
         enriched_rollouts = []
         for rollout in agent_rollouts:

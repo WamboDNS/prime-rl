@@ -405,13 +405,28 @@ async def orchestrate(config: OrchestratorConfig):
             trainable_agent_ids: list[str] | None = None
             all_agent_ids: list[str] | None = None
 
-            for rollout in train_rollouts:
+            # Filter out rollouts with empty agent_rollouts (e.g. all turns errored)
+            valid_rollouts = []
+            for i, rollout in enumerate(train_rollouts):
                 agent_rollouts = rollout.get("agent_rollouts")
                 if not agent_rollouts:
-                    raise ValueError(
-                        "Multi-agent rollout missing agent_rollouts; "
-                        "ensure env_worker passes agent_rollouts in state_columns"
+                    logger.warning(
+                        f"Skipping multi-agent rollout[{i}]: empty agent_rollouts "
+                        f"(example_id={rollout.get('example_id')}, "
+                        f"error={rollout.get('error')})"
                     )
+                    continue
+                valid_rollouts.append(rollout)
+
+            if len(valid_rollouts) < len(train_rollouts):
+                logger.info(
+                    f"Filtered {len(train_rollouts) - len(valid_rollouts)}/{len(train_rollouts)} "
+                    f"error rollouts with empty agent_rollouts"
+                )
+            train_rollouts = valid_rollouts
+
+            for i, rollout in enumerate(train_rollouts):
+                agent_rollouts = rollout.get("agent_rollouts")
 
                 reward_map: dict[str, float] = {}
                 all_reward_map: dict[str, float] = {}
@@ -458,39 +473,47 @@ async def orchestrate(config: OrchestratorConfig):
                 per_rollout_agent_completion_lens.append(length_map)
                 per_rollout_all_agent_rewards.append(all_reward_map)
 
-            if trainable_agent_ids is None:
-                raise ValueError("No trainable agents found in multi-agent rollouts")
+            if not train_rollouts:
+                # All rollouts were filtered — will produce 0 training samples,
+                # caught by empty batch retry below
+                rewards = []
+                completion_lens = []
+                advantages = []
+                per_rollout_agent_advantages = []
+            else:
+                if trainable_agent_ids is None:
+                    raise ValueError("No trainable agents found in multi-agent rollouts")
 
-            per_rollout_agent_advantages: list[dict[str, float]] = [
-                {} for _ in range(len(train_rollouts))
-            ]
-            for agent_id in trainable_agent_ids:
-                agent_rewards = [
-                    per_rollout_agent_rewards[i][agent_id]
-                    for i in range(len(train_rollouts))
+                per_rollout_agent_advantages: list[dict[str, float]] = [
+                    {} for _ in range(len(train_rollouts))
                 ]
-                agent_completion_lens = [
-                    per_rollout_agent_completion_lens[i][agent_id]
-                    for i in range(len(train_rollouts))
-                ]
-                agent_advantages = compute_advantages(
-                    agent_rewards,
-                    agent_completion_lens,
+                for agent_id in trainable_agent_ids:
+                    agent_rewards = [
+                        per_rollout_agent_rewards[i][agent_id]
+                        for i in range(len(train_rollouts))
+                    ]
+                    agent_completion_lens = [
+                        per_rollout_agent_completion_lens[i][agent_id]
+                        for i in range(len(train_rollouts))
+                    ]
+                    agent_advantages = compute_advantages(
+                        agent_rewards,
+                        agent_completion_lens,
+                        config.rollouts_per_example,
+                        config.advantage,
+                    )
+                    for i, adv in enumerate(agent_advantages):
+                        per_rollout_agent_advantages[i][agent_id] = adv
+
+                # Compute overall rewards/advantages for logging only
+                rewards = [rollout["reward"] for rollout in train_rollouts]
+                completion_lens = [get_completion_len(rollout) for rollout in train_rollouts]
+                advantages = compute_advantages(
+                    rewards,
+                    completion_lens,
                     config.rollouts_per_example,
                     config.advantage,
                 )
-                for i, adv in enumerate(agent_advantages):
-                    per_rollout_agent_advantages[i][agent_id] = adv
-
-            # Compute overall rewards/advantages for logging only
-            rewards = [rollout["reward"] for rollout in train_rollouts]
-            completion_lens = [get_completion_len(rollout) for rollout in train_rollouts]
-            advantages = compute_advantages(
-                rewards,
-                completion_lens,
-                config.rollouts_per_example,
-                config.advantage,
-            )
         else:
             # Compute advantages (single-agent)
             rewards = [rollout["reward"] for rollout in train_rollouts]

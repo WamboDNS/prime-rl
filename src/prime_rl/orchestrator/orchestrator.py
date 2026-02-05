@@ -401,7 +401,9 @@ async def orchestrate(config: OrchestratorConfig):
 
             per_rollout_agent_rewards: list[dict[str, float]] = []
             per_rollout_agent_completion_lens: list[dict[str, int]] = []
+            per_rollout_all_agent_rewards: list[dict[str, float]] = []
             trainable_agent_ids: list[str] | None = None
+            all_agent_ids: list[str] | None = None
 
             for rollout in train_rollouts:
                 agent_rollouts = rollout.get("agent_rollouts")
@@ -412,17 +414,21 @@ async def orchestrate(config: OrchestratorConfig):
                     )
 
                 reward_map: dict[str, float] = {}
+                all_reward_map: dict[str, float] = {}
                 length_map: dict[str, int] = {}
                 for agent_rollout in agent_rollouts:
                     meta = agent_rollout.get("meta", {})
-                    if not meta.get("trainable", True):
-                        continue
                     agent_id = meta.get("agent_id")
                     if not agent_id:
                         raise ValueError("agent_rollout meta missing agent_id")
                     reward = agent_rollout.get("total_reward")
                     if reward is None:
                         raise ValueError(f"Missing total_reward for agent {agent_id!r}")
+
+                    all_reward_map[agent_id] = float(reward)
+
+                    if not meta.get("trainable", True):
+                        continue
 
                     steps = agent_rollout.get("steps", [])
                     if not steps:
@@ -445,9 +451,12 @@ async def orchestrate(config: OrchestratorConfig):
                     trainable_agent_ids = sorted(reward_map.keys())
                 elif set(reward_map.keys()) != set(trainable_agent_ids):
                     raise ValueError("Trainable agent set mismatch across rollouts")
+                if all_agent_ids is None:
+                    all_agent_ids = sorted(all_reward_map.keys())
 
                 per_rollout_agent_rewards.append(reward_map)
                 per_rollout_agent_completion_lens.append(length_map)
+                per_rollout_all_agent_rewards.append(all_reward_map)
 
             if trainable_agent_ids is None:
                 raise ValueError("No trainable agents found in multi-agent rollouts")
@@ -702,8 +711,25 @@ async def orchestrate(config: OrchestratorConfig):
             "scoring_ms/min": results_df.groupby("example_id").scoring_ms.mean().min(),
             # Performance metrics
             "perf/throughput": throughput,
-            # Train reward
-            "reward/mean": results_df.reward.mean(),
+            # Train reward (for multi-agent: mean of trainable agent rewards)
+            "reward/mean": (
+                sum(
+                    sum(r.values()) / len(r) for r in per_rollout_agent_rewards
+                ) / len(per_rollout_agent_rewards)
+                if is_multi_agent
+                else results_df.reward.mean()
+            ),
+            # Per-agent rewards (multi-agent only, all agents by name)
+            **(
+                {
+                    f"reward/{agent_id}/mean": sum(
+                        r.get(agent_id, 0.0) for r in per_rollout_all_agent_rewards
+                    ) / len(per_rollout_all_agent_rewards)
+                    for agent_id in all_agent_ids
+                }
+                if is_multi_agent and all_agent_ids
+                else {}
+            ),
             "sampling/temperature": temperature,
             # Batch metrics
             "batch/solve_none": solve_none,
@@ -768,15 +794,23 @@ async def orchestrate(config: OrchestratorConfig):
         monitor.log_samples(subset_train_rollouts, step=progress.step)
 
         # Log distributions (rewards, advantages) if enabled
-        monitor.log_distributions(
-            distributions={
-                "rewards": rewards,
-                "advantages": advantages,
-            },
-            step=progress.step,
-        )
+        distributions: dict[str, list] = {"rewards": rewards, "advantages": advantages}
+        if is_multi_agent and all_agent_ids:
+            for agent_id in all_agent_ids:
+                distributions[f"rewards/{agent_id}"] = [
+                    r.get(agent_id, 0.0) for r in per_rollout_all_agent_rewards
+                ]
+        monitor.log_distributions(distributions=distributions, step=progress.step)
 
-        step_message = f"Step {progress.step} | Time: {step_time:.2f}s | Reward: {results_df.reward.mean():.4f} |{f' Val. Reward: {val_results_df.reward.mean():.4f} |' if val_results_df is not None else ''} Throughput: {throughput:.1f} tokens/s | Seq. Length: {results_df.groupby('example_id').seq_len.mean().mean():.1f} tokens/sample | Async Level: {scheduler.async_level} | Max. Off-Policy Level: {scheduler.max_off_policy_level}"
+        if is_multi_agent and all_agent_ids:
+            agent_reward_strs = " | ".join(
+                f"{aid}: {sum(r.get(aid, 0.0) for r in per_rollout_all_agent_rewards) / len(per_rollout_all_agent_rewards):.4f}"
+                for aid in all_agent_ids
+            )
+            reward_str = f"Rewards [{agent_reward_strs}]"
+        else:
+            reward_str = f"Reward: {results_df.reward.mean():.4f}"
+        step_message = f"Step {progress.step} | Time: {step_time:.2f}s | {reward_str} |{f' Val. Reward: {val_results_df.reward.mean():.4f} |' if val_results_df is not None else ''} Throughput: {throughput:.1f} tokens/s | Seq. Length: {results_df.groupby('example_id').seq_len.mean().mean():.1f} tokens/sample | Async Level: {scheduler.async_level} | Max. Off-Policy Level: {scheduler.max_off_policy_level}"
         logger.success(step_message)
 
         # Increment step

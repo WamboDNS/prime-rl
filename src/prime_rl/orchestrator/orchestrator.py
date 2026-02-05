@@ -405,25 +405,24 @@ async def orchestrate(config: OrchestratorConfig):
             trainable_agent_ids: list[str] | None = None
             all_agent_ids: list[str] | None = None
 
-            # Filter out rollouts with empty agent_rollouts (e.g. all turns errored)
-            valid_rollouts = []
-            for i, rollout in enumerate(train_rollouts):
-                agent_rollouts = rollout.get("agent_rollouts")
-                if not agent_rollouts:
-                    logger.warning(
-                        f"Skipping multi-agent rollout[{i}]: empty agent_rollouts "
-                        f"(example_id={rollout.get('example_id')}, "
-                        f"error={rollout.get('error')})"
-                    )
-                    continue
-                valid_rollouts.append(rollout)
+            # Filter out rollouts with empty agent_rollouts (e.g. all turns errored).
+            # Must drop ALL rollouts for an example_id if any are broken, because
+            # compute_advantages requires rollouts_per_example per group.
+            broken_example_ids: set[int] = set()
+            for rollout in train_rollouts:
+                if not rollout.get("agent_rollouts"):
+                    broken_example_ids.add(rollout.get("example_id"))
 
-            if len(valid_rollouts) < len(train_rollouts):
-                logger.info(
-                    f"Filtered {len(train_rollouts) - len(valid_rollouts)}/{len(train_rollouts)} "
-                    f"error rollouts with empty agent_rollouts"
+            if broken_example_ids:
+                original_count = len(train_rollouts)
+                train_rollouts = [
+                    r for r in train_rollouts
+                    if r.get("example_id") not in broken_example_ids
+                ]
+                logger.warning(
+                    f"Filtered {original_count - len(train_rollouts)}/{original_count} "
+                    f"rollouts: examples {broken_example_ids} had empty agent_rollouts"
                 )
-            train_rollouts = valid_rollouts
 
             for i, rollout in enumerate(train_rollouts):
                 agent_rollouts = rollout.get("agent_rollouts")

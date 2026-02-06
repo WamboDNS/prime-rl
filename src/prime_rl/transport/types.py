@@ -15,6 +15,10 @@ class TrainingSample(msgspec.Struct, array_like=True, gc=False, omit_defaults=Tr
     advantage: float | None = None
     reward: float | None = None
 
+    # Multi-agent LoRA routing (for MultiAgentEnv)
+    # When set, this sample should be trained on the specified LoRA adapter
+    lora_id: int | None = None
+
     # Multimodal fields (Qwen3-VL)
     # pixel_values: flattened image patches [num_patches, patch_dim] where patch_dim=1176 for Qwen3-VL
     pixel_values: list[list[float]] | None = None

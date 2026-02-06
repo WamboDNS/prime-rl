@@ -332,3 +332,101 @@ def build_vlm_image_cache(rollouts: list[vf.State], processor) -> VLMImageCache:
         extract_time=extract_time,
         preprocess_time=preprocess_time,
     )
+
+
+# =============================================================================
+# Multi-agent rollout processing
+# =============================================================================
+
+
+def process_multi_agent_rollout(
+    state: vf.State,
+    agent_rewards: dict[str, float] | None = None,
+    agent_advantages: dict[str, float] | None = None,
+    vlm_cache: "VLMImageCache | None" = None,
+    cache_key: int | None = None,
+) -> list[TrainingSample] | None:
+    """
+    Convert multi-agent vf.State to training samples with per-agent lora_id tagging.
+
+    For MultiAgentEnv rollouts, extracts agent_rollouts and converts each trainable
+    agent's trajectory into TrainingSamples tagged with the agent's lora_id.
+
+    Args:
+        state: vf.State containing agent_rollouts from MultiAgentEnv
+        agent_rewards: Per-agent total rewards for this rollout
+        agent_advantages: Per-agent advantages for this rollout
+        vlm_cache: Pre-computed VLM image cache for multimodal training
+        cache_key: Cache key to use when retrieving images from the VLM cache
+
+    Returns:
+        List of TrainingSamples with lora_id set, or None if no valid samples
+    """
+    logger = get_logger()
+
+    agent_rollouts = state.get("agent_rollouts", [])
+    if not agent_rollouts:
+        logger.warning(f"No agent_rollouts for example {state['example_id']}. Skipping.")
+        return None
+
+    has_error = state.get("error") is not None
+    samples: list[TrainingSample] = []
+
+    for agent_rollout in agent_rollouts:
+        meta = agent_rollout.get("meta", {})
+        trainable = meta.get("trainable", True)
+        lora_id = meta.get("lora_id")
+        agent_id = meta.get("agent_id")
+
+        if not trainable:
+            continue
+        if not agent_id:
+            raise ValueError("agent_rollout meta missing agent_id")
+        if agent_rewards is None or agent_id not in agent_rewards:
+            raise ValueError(f"Missing reward for agent {agent_id!r}")
+        if agent_advantages is None or agent_id not in agent_advantages:
+            raise ValueError(f"Missing advantage for agent {agent_id!r}")
+
+        steps = agent_rollout.get("steps", [])
+        for step_idx, step in enumerate(steps):
+            tokens = step.get("tokens")
+            if tokens is None:
+                continue
+
+            temperature = step.get("temperature", 1.0)
+            completion_ids = list(tokens["completion_ids"])
+
+            if has_error:
+                completion_mask = [False] * len(tokens["completion_mask"])
+            else:
+                completion_mask = [bool(i) for i in tokens["completion_mask"]]
+
+            # Get cumulative images up to this step
+            if vlm_cache is not None:
+                key = state["example_id"] if cache_key is None else cache_key
+                pixel_values, image_grid_thw = vlm_cache.get_for_step(key, step_idx)
+            else:
+                pixel_values, image_grid_thw = None, None
+
+            sample = TrainingSample(
+                prompt_ids=list(tokens["prompt_ids"]),
+                prompt_mask=[bool(i) for i in tokens["prompt_mask"]],
+                completion_ids=completion_ids,
+                completion_mask=completion_mask,
+                completion_logprobs=list(tokens["completion_logprobs"]),
+                completion_temperatures=[temperature] * len(completion_ids),
+                teacher_logprobs=None,
+                advantage=agent_advantages[agent_id],
+                reward=agent_rewards[agent_id],
+                lora_id=lora_id,
+                pixel_values=pixel_values,
+                image_grid_thw=image_grid_thw,
+            )
+            samples.append(sample)
+
+    return samples if samples else None
+
+
+def is_multi_agent_state(state: vf.State) -> bool:
+    """Check if a state is from a MultiAgentEnv rollout."""
+    return "agent_rollouts" in state and len(state.get("agent_rollouts", [])) > 0

@@ -8,7 +8,13 @@ import tomli_w
 from prime_rl.orchestrator.advantage import compute_advantages
 from prime_rl.orchestrator.event_loop_lag import EventLoopLagMonitor
 from prime_rl.orchestrator.patches import monkey_patch_chat_completion_logprobs, monkey_patch_oai_iterable_types
-from prime_rl.orchestrator.trajectories import branch_rollout, build_vlm_image_cache, interleave_rollout
+from prime_rl.orchestrator.trajectories import (
+    branch_rollout,
+    build_vlm_image_cache,
+    interleave_rollout,
+    is_multi_agent_state,
+    process_multi_agent_rollout,
+)
 from prime_rl.transport import TrainingBatch, TrainingSample, setup_training_batch_sender
 
 # This monkey patch is necessary to avoid Pydantic validating fields using typing.Iterable (e.g. in multimodal or tool call messages) lazily which leads to tokenization errors, for more info see https://github.com/PrimeIntellect-ai/prime-rl/pull/1249
@@ -384,20 +390,140 @@ async def orchestrate(config: OrchestratorConfig):
         generate_completions_time = scheduler.last_batch_generation_time
         train_rollouts = train_task.result()
 
-        # Compute advantages
-        rewards = [rollout["reward"] for rollout in train_rollouts]
-        completion_lens = [get_completion_len(rollout) for rollout in train_rollouts]
-        advantages = compute_advantages(
-            rewards,
-            completion_lens,
-            config.rollouts_per_example,
-            config.advantage,
-        )
-
         # Convert rollouts to training samples
         parallel_preprocess_start = time.perf_counter()
 
         num_unique_examples = len({r["example_id"] for r in train_rollouts})
+
+        # Detect multi-agent environment (check first rollout)
+        is_multi_agent = train_rollouts and is_multi_agent_state(train_rollouts[0])
+        if is_multi_agent:
+            logger.info("Detected multi-agent environment, using multi-agent rollout processing")
+
+            per_rollout_agent_rewards: list[dict[str, float]] = []
+            per_rollout_agent_completion_lens: list[dict[str, int]] = []
+            per_rollout_all_agent_rewards: list[dict[str, float]] = []
+            trainable_agent_ids: list[str] | None = None
+            all_agent_ids: list[str] | None = None
+
+            # Filter out rollouts with empty agent_rollouts (e.g. all turns errored).
+            # Must drop ALL rollouts for an example_id if any are broken, because
+            # compute_advantages requires rollouts_per_example per group.
+            broken_example_ids: set[int] = set()
+            for rollout in train_rollouts:
+                if not rollout.get("agent_rollouts"):
+                    broken_example_ids.add(rollout.get("example_id"))
+
+            if broken_example_ids:
+                original_count = len(train_rollouts)
+                train_rollouts = [
+                    r for r in train_rollouts
+                    if r.get("example_id") not in broken_example_ids
+                ]
+                logger.warning(
+                    f"Filtered {original_count - len(train_rollouts)}/{original_count} "
+                    f"rollouts: examples {broken_example_ids} had empty agent_rollouts"
+                )
+
+            for i, rollout in enumerate(train_rollouts):
+                agent_rollouts = rollout.get("agent_rollouts")
+
+                reward_map: dict[str, float] = {}
+                all_reward_map: dict[str, float] = {}
+                length_map: dict[str, int] = {}
+                for agent_rollout in agent_rollouts:
+                    meta = agent_rollout.get("meta", {})
+                    agent_id = meta.get("agent_id")
+                    if not agent_id:
+                        raise ValueError("agent_rollout meta missing agent_id")
+                    reward = agent_rollout.get("total_reward")
+                    if reward is None:
+                        raise ValueError(f"Missing total_reward for agent {agent_id!r}")
+
+                    all_reward_map[agent_id] = float(reward)
+
+                    if not meta.get("trainable", True):
+                        continue
+
+                    steps = agent_rollout.get("steps", [])
+                    if not steps:
+                        raise ValueError(f"No steps for agent {agent_id!r}")
+                    completion_len = 0
+                    for step in steps:
+                        tokens = step.get("tokens")
+                        if tokens is None:
+                            raise ValueError(
+                                f"Missing tokens for agent {agent_id!r} step; cannot compute completion length"
+                            )
+                        completion_len += len(tokens["completion_ids"])
+
+                    reward_map[agent_id] = float(reward)
+                    length_map[agent_id] = completion_len
+
+                if not reward_map:
+                    raise ValueError("No trainable agent rollouts found")
+                if trainable_agent_ids is None:
+                    trainable_agent_ids = sorted(reward_map.keys())
+                elif set(reward_map.keys()) != set(trainable_agent_ids):
+                    raise ValueError("Trainable agent set mismatch across rollouts")
+                if all_agent_ids is None:
+                    all_agent_ids = sorted(all_reward_map.keys())
+
+                per_rollout_agent_rewards.append(reward_map)
+                per_rollout_agent_completion_lens.append(length_map)
+                per_rollout_all_agent_rewards.append(all_reward_map)
+
+            if not train_rollouts:
+                # All rollouts were filtered — will produce 0 training samples,
+                # caught by empty batch retry below
+                rewards = []
+                completion_lens = []
+                advantages = []
+                per_rollout_agent_advantages = []
+            else:
+                if trainable_agent_ids is None:
+                    raise ValueError("No trainable agents found in multi-agent rollouts")
+
+                per_rollout_agent_advantages: list[dict[str, float]] = [
+                    {} for _ in range(len(train_rollouts))
+                ]
+                for agent_id in trainable_agent_ids:
+                    agent_rewards = [
+                        per_rollout_agent_rewards[i][agent_id]
+                        for i in range(len(train_rollouts))
+                    ]
+                    agent_completion_lens = [
+                        per_rollout_agent_completion_lens[i][agent_id]
+                        for i in range(len(train_rollouts))
+                    ]
+                    agent_advantages = compute_advantages(
+                        agent_rewards,
+                        agent_completion_lens,
+                        config.rollouts_per_example,
+                        config.advantage,
+                    )
+                    for i, adv in enumerate(agent_advantages):
+                        per_rollout_agent_advantages[i][agent_id] = adv
+
+                # Compute overall rewards/advantages for logging only
+                rewards = [rollout["reward"] for rollout in train_rollouts]
+                completion_lens = [get_completion_len(rollout) for rollout in train_rollouts]
+                advantages = compute_advantages(
+                    rewards,
+                    completion_lens,
+                    config.rollouts_per_example,
+                    config.advantage,
+                )
+        else:
+            # Compute advantages (single-agent)
+            rewards = [rollout["reward"] for rollout in train_rollouts]
+            completion_lens = [get_completion_len(rollout) for rollout in train_rollouts]
+            advantages = compute_advantages(
+                rewards,
+                completion_lens,
+                config.rollouts_per_example,
+                config.advantage,
+            )
 
         # VLM: build image cache for efficient batched preprocessing
         if is_vlm:
@@ -409,7 +535,18 @@ async def orchestrate(config: OrchestratorConfig):
             vlm_cache = None
 
         # Process rollouts in parallel
-        if config.trajectory_strategy == "interleaved":
+        if is_multi_agent:
+
+            def process_rollout(rollout: vf.State, rollout_idx: int) -> list[TrainingSample] | None:
+                return process_multi_agent_rollout(
+                    rollout,
+                    agent_rewards=per_rollout_agent_rewards[rollout_idx],
+                    agent_advantages=per_rollout_agent_advantages[rollout_idx],
+                    vlm_cache=vlm_cache,
+                    cache_key=rollout_idx,
+                )
+
+        elif config.trajectory_strategy == "interleaved":
 
             def process_rollout(rollout: vf.State) -> list[TrainingSample] | None:
                 return interleave_rollout(rollout)
@@ -419,7 +556,7 @@ async def orchestrate(config: OrchestratorConfig):
                 return branch_rollout(rollout, vlm_cache=vlm_cache, cache_key=rollout_idx)
 
         loop = asyncio.get_event_loop()
-        if config.trajectory_strategy == "interleaved":
+        if config.trajectory_strategy == "interleaved" and not is_multi_agent:
             futures = [loop.run_in_executor(rollout_executor, process_rollout, r) for r in train_rollouts]
         else:
             futures = [
@@ -430,17 +567,27 @@ async def orchestrate(config: OrchestratorConfig):
 
         # Collect results and assign advantages
         train_examples: list[TrainingSample] = []
-        for rollout, advantage, samples in zip(train_rollouts, advantages, results):
-            if samples is not None:
+        if is_multi_agent:
+            for samples in results:
+                if samples is None:
+                    continue
                 for sample in samples:
-                    sample.advantage = advantage
-                    sample.reward = rollout["reward"]
+                    if sample.reward is None or sample.advantage is None:
+                        raise ValueError("Multi-agent sample missing reward or advantage")
                 train_examples.extend(samples)
+        else:
+            for rollout, advantage, samples in zip(train_rollouts, advantages, results):
+                if samples is not None:
+                    for sample in samples:
+                        sample.advantage = advantage
+                        sample.reward = rollout["reward"]
+                    train_examples.extend(samples)
 
         parallel_preprocess_time = time.perf_counter() - parallel_preprocess_start
+        strategy_desc = "multi-agent" if is_multi_agent else config.trajectory_strategy
         logger.debug(
             f"Converted {len(train_rollouts)} rollouts ({num_unique_examples} unique examples) "
-            f"to {len(train_examples)} training examples using {config.trajectory_strategy} strategy"
+            f"to {len(train_examples)} training examples using {strategy_desc} strategy"
         )
 
         # Compute teacher logprobs if teacher model is configured
@@ -587,8 +734,25 @@ async def orchestrate(config: OrchestratorConfig):
             "scoring_ms/min": results_df.groupby("example_id").scoring_ms.mean().min(),
             # Performance metrics
             "perf/throughput": throughput,
-            # Train reward
-            "reward/mean": results_df.reward.mean(),
+            # Train reward (for multi-agent: mean of trainable agent rewards)
+            "reward/mean": (
+                sum(
+                    sum(r.values()) / len(r) for r in per_rollout_agent_rewards
+                ) / len(per_rollout_agent_rewards)
+                if is_multi_agent
+                else results_df.reward.mean()
+            ),
+            # Per-agent rewards (multi-agent only, all agents by name)
+            **(
+                {
+                    f"reward/{agent_id}/mean": sum(
+                        r.get(agent_id, 0.0) for r in per_rollout_all_agent_rewards
+                    ) / len(per_rollout_all_agent_rewards)
+                    for agent_id in all_agent_ids
+                }
+                if is_multi_agent and all_agent_ids
+                else {}
+            ),
             "sampling/temperature": temperature,
             # Batch metrics
             "batch/solve_none": solve_none,
@@ -653,15 +817,23 @@ async def orchestrate(config: OrchestratorConfig):
         monitor.log_samples(subset_train_rollouts, step=progress.step)
 
         # Log distributions (rewards, advantages) if enabled
-        monitor.log_distributions(
-            distributions={
-                "rewards": rewards,
-                "advantages": advantages,
-            },
-            step=progress.step,
-        )
+        distributions: dict[str, list] = {"rewards": rewards, "advantages": advantages}
+        if is_multi_agent and all_agent_ids:
+            for agent_id in all_agent_ids:
+                distributions[f"rewards/{agent_id}"] = [
+                    r.get(agent_id, 0.0) for r in per_rollout_all_agent_rewards
+                ]
+        monitor.log_distributions(distributions=distributions, step=progress.step)
 
-        step_message = f"Step {progress.step} | Time: {step_time:.2f}s | Reward: {results_df.reward.mean():.4f} |{f' Val. Reward: {val_results_df.reward.mean():.4f} |' if val_results_df is not None else ''} Throughput: {throughput:.1f} tokens/s | Seq. Length: {results_df.groupby('example_id').seq_len.mean().mean():.1f} tokens/sample | Async Level: {scheduler.async_level} | Max. Off-Policy Level: {scheduler.max_off_policy_level}"
+        if is_multi_agent and all_agent_ids:
+            agent_reward_strs = " | ".join(
+                f"{aid}: {sum(r.get(aid, 0.0) for r in per_rollout_all_agent_rewards) / len(per_rollout_all_agent_rewards):.4f}"
+                for aid in all_agent_ids
+            )
+            reward_str = f"Rewards [{agent_reward_strs}]"
+        else:
+            reward_str = f"Reward: {results_df.reward.mean():.4f}"
+        step_message = f"Step {progress.step} | Time: {step_time:.2f}s | {reward_str} |{f' Val. Reward: {val_results_df.reward.mean():.4f} |' if val_results_df is not None else ''} Throughput: {throughput:.1f} tokens/s | Seq. Length: {results_df.groupby('example_id').seq_len.mean().mean():.1f} tokens/sample | Async Level: {scheduler.async_level} | Max. Off-Policy Level: {scheduler.max_off_policy_level}"
         logger.success(step_message)
 
         # Increment step

@@ -60,7 +60,6 @@ class SinglePacker(BasePacker):
         start_step: int = 0,
     ):
         super().__init__(dp_world_size, seq_len, pad_to_multiple_of, tokenizer, config, start_step)
-        assert self.multi_run_manager.max_runs == 1, "SinglePacker only supports one run"
 
     def pack(self):
         # Wait for batch to be available
@@ -75,13 +74,42 @@ class SinglePacker(BasePacker):
 
         self.multi_run_manager.ready_to_update[0] = True
         self.multi_run_manager.progress[0].step += 1
+
+        # Check for multi-agent samples (samples with lora_id set)
+        # This enables multi-LoRA training within a single run
+        lora_ids = [sample.lora_id for sample in batch.examples]
+        has_multi_agent = any(lid is not None for lid in lora_ids)
+
+        if has_multi_agent:
+            # Multi-agent: route each sample to its specified LoRA adapter
+            idxs = [lid if lid is not None else 0 for lid in lora_ids]
+            max_lora_id = max(idxs)
+            unique_loras = set(idxs)
+            self.logger.debug(
+                f"Multi-agent batch: {len(batch.examples)} samples across {len(unique_loras)} LoRA adapters "
+                f"(ids: {sorted(unique_loras)})"
+            )
+
+            # Validate that max_runs is configured with enough LoRA adapters
+            if max_lora_id >= self.multi_run_manager.max_runs:
+                raise ValueError(
+                    f"Multi-agent sample has lora_id={max_lora_id} but trainer only has "
+                    f"{self.multi_run_manager.max_runs} LoRA adapter(s). "
+                    f"Set max_runs >= {max_lora_id + 1} in trainer config for multi-agent training."
+                )
+            num_loras = self.multi_run_manager.max_runs
+        else:
+            # Standard single-adapter mode
+            idxs = [0] * len(batch.examples)
+            num_loras = self.multi_run_manager.max_runs
+
         micro_batch_grid = prepare_batch(
             rollouts=batch.examples,
             seq_len=self.seq_len,
             pad_to_multiple_of=self.pad_to_multiple_of,
             num_train_workers=self.dp_world_size,
-            idxs=[0] * len(batch.examples),
-            num_loras=self.multi_run_manager.max_runs,
+            idxs=idxs,
+            num_loras=num_loras,
         )
 
         self.sender.send(micro_batch_grid)
@@ -268,14 +296,32 @@ class MultiPacker(BasePacker):
         selected_samples = self._select_samples_round_robin(token_budget)
         assert selected_samples, "No samples selected"
 
-        # Group samples by run_idx - each microbatch must contain samples from only ONE run
-        # because MultiLoRAGroupedExperts (MoE) only supports one adapter per microbatch
-        samples_by_run: dict[int, list[TrainingSample]] = {}
+        # Group samples by run_idx (and lora_id if present) to avoid adapter mixing
+        has_lora_ids = any(sample.lora_id is not None for _, sample, _ in selected_samples)
+        if has_lora_ids:
+            lora_idxs = [
+                sample.lora_id if sample.lora_id is not None else 0
+                for _, sample, _ in selected_samples
+            ]
+            max_lora_id = max(lora_idxs)
+            if max_lora_id >= self.multi_run_manager.max_runs:
+                raise ValueError(
+                    f"Multi-agent sample has lora_id={max_lora_id} but trainer only has "
+                    f"{self.multi_run_manager.max_runs} LoRA adapter(s). "
+                    f"Set max_runs >= {max_lora_id + 1} in trainer config for multi-agent training."
+                )
+
+        samples_by_run: dict[tuple[int, int] | int, list[TrainingSample]] = {}
         per_run_stats: dict[int, tuple[int, int]] = {}
         for run_idx, sample, step in selected_samples:
-            if run_idx not in samples_by_run:
-                samples_by_run[run_idx] = []
-            samples_by_run[run_idx].append(sample)
+            if has_lora_ids:
+                lora_idx = sample.lora_id if sample.lora_id is not None else 0
+                key = (run_idx, lora_idx)
+            else:
+                key = run_idx
+            if key not in samples_by_run:
+                samples_by_run[key] = []
+            samples_by_run[key].append(sample)
 
             num_tokens = len(sample.prompt_ids) + len(sample.completion_ids)
             if run_idx in per_run_stats:
@@ -287,16 +333,23 @@ class MultiPacker(BasePacker):
         for run_idx, (num_samples, num_tokens) in per_run_stats.items():
             self._update_run_progress(run_idx, num_samples, num_tokens)
 
-        # Pack each run separately to ensure no mixing of runs in microbatches
+        # Pack each run (and lora_id) separately to ensure no mixing of adapters in microbatches
         all_micro_batches: list[list[MicroBatch]] = [[] for _ in range(self.dp_world_size)]
         for run_idx in sorted(samples_by_run.keys()):
-            run_samples = samples_by_run[run_idx]
+            if has_lora_ids:
+                run_id, lora_idx = run_idx
+                run_samples = samples_by_run[(run_id, lora_idx)]
+                idxs = [lora_idx] * len(run_samples)
+            else:
+                run_id = run_idx
+                run_samples = samples_by_run[run_id]
+                idxs = [run_id] * len(run_samples)
             run_micro_batch_grid = prepare_batch(
                 rollouts=run_samples,
                 seq_len=self.seq_len,
                 pad_to_multiple_of=self.pad_to_multiple_of,
                 num_train_workers=self.dp_world_size,
-                idxs=[run_idx] * len(run_samples),
+                idxs=idxs,
                 num_loras=self.multi_run_manager.max_runs,
             )
             # Merge into combined grid

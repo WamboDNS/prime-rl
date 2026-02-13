@@ -46,6 +46,9 @@ warmup_steps = 10
 [trainer.ckpt]
 interval = 50
 
+[trainer.wandb]
+project = "sdft-tooluse"
+
 [trainer]
 max_steps = 126  # ceil(4046 / 32)
 output_dir = "outputs/sdft-tooluse"

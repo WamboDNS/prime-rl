@@ -7,12 +7,14 @@ Usage:
     uv run python scripts/sdft/eval_tooluse.py \
         --eval-data /path/to/eval_data.json \
         --base-url http://localhost:8000/v1 \
-        --model Qwen/Qwen2.5-7B-Instruct
+        --model Qwen/Qwen2.5-7B-Instruct \
+        --label baseline --output results/baseline.json
 """
 
 import argparse
 import json
 import re
+from pathlib import Path
 
 from openai import OpenAI
 
@@ -65,6 +67,8 @@ def main():
     parser.add_argument("--base-url", type=str, default="http://localhost:8000/v1", help="OpenAI-compatible API base URL")
     parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-7B-Instruct", help="Model name")
     parser.add_argument("--max-tokens", type=int, default=1024, help="Max tokens to generate")
+    parser.add_argument("--label", type=str, default=None, help="Label for this run (e.g. 'baseline', 'sdft')")
+    parser.add_argument("--output", type=str, default=None, help="Path to save JSON results")
     args = parser.parse_args()
 
     with open(args.eval_data) as f:
@@ -74,6 +78,7 @@ def main():
 
     correct = 0
     total = len(eval_data)
+    samples = []
 
     for i, example in enumerate(eval_data):
         prompt = example["prompt"]
@@ -98,8 +103,31 @@ def main():
                 print(f"       pred: {predicted[0]['Action']}({predicted[0]['Action_Input']})")
             print(f"       gold: {golden[0]['Action']}({golden[0]['Action_Input']})")
 
+        samples.append({
+            "index": i,
+            "api_name": example.get("name", ""),
+            "correct": match,
+            "predicted": predicted,
+            "golden": golden,
+            "completion": completion,
+        })
+
     accuracy = correct / total * 100
     print(f"\nAccuracy: {correct}/{total} = {accuracy:.1f}%")
+
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        results = {
+            "label": args.label,
+            "model": args.model,
+            "accuracy": round(accuracy, 1),
+            "correct": correct,
+            "total": total,
+            "samples": samples,
+        }
+        output_path.write_text(json.dumps(results, indent=2))
+        print(f"Results saved to {output_path}")
 
 
 if __name__ == "__main__":

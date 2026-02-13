@@ -1,0 +1,54 @@
+# Tool Use SDFT — Self-Distillation paper reproduction
+# Paper: arxiv.org/abs/2601.19897
+# Target: Base 42.9% → SDFT 70.6% accuracy
+# Usage: uv run sdft @ configs/sdft/tooluse.toml
+
+[trainer.model]
+name = "Qwen/Qwen2.5-7B-Instruct"
+fused_lm_head_chunk_size = "disabled"
+
+[trainer.data]
+dataset_name = "data/tooluse_sdft"  # output of prepare_tooluse.py
+prompt_field = "prompt"
+teacher_prompt_field = "teacher_prompt"
+batch_size = 32
+micro_batch_size = 1
+
+[trainer.loss]
+alpha = 0.0  # forward KL
+temperature = 1.0
+num_loss_tokens_to_skip = 3
+
+[trainer.ref_model]
+enabled = true
+sync_steps = 1
+mixup_alpha = 0.01
+
+[trainer.generation]
+generate_from_teacher = false
+max_completion_length = 1024
+max_prompt_length = 1024
+temperature = 1.0
+num_iterations = 1
+
+[trainer.optim]
+type = "adamw"
+lr = 2e-5
+weight_decay = 0.0
+
+[trainer.scheduler]
+type = "cosine"
+warmup_steps = 10
+
+[trainer]
+max_steps = 126  # ceil(4046 / 32)
+output_dir = "outputs/sdft-tooluse"
+
+inference_gpu_ids = [0]
+trainer_gpu_ids = [1]
+
+[inference.model]
+max_model_len = 4096
+
+[inference.server]
+port = 8000

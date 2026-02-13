@@ -3,6 +3,9 @@
 # Target: Base 42.9% → SDFT 70.6% accuracy
 # Usage: uv run sdft @ configs/sdft/tooluse.toml
 
+inference_gpu_ids = [0]
+trainer_gpu_ids = [1, 2, 3]
+
 [trainer.model]
 name = "Qwen/Qwen2.5-7B-Instruct"
 fused_lm_head_chunk_size = "disabled"
@@ -40,8 +43,8 @@ weight_decay = 0.0
 type = "cosine"
 warmup_steps = 10
 
-inference_gpu_ids = [0]
-trainer_gpu_ids = [1, 2, 3]
+[trainer.ckpt]
+interval = 50
 
 [trainer]
 max_steps = 126  # ceil(4046 / 32)

@@ -1,7 +1,8 @@
+from pathlib import Path
 from typing import TypedDict, cast
 
 import torch
-from datasets import Dataset, load_dataset
+from datasets import Dataset, load_dataset, load_from_disk
 from torch import Tensor
 from torch.utils.data import IterableDataset
 from transformers.tokenization_utils import PreTrainedTokenizer
@@ -120,7 +121,10 @@ def setup_sdft_dataset(config: SDFTDataConfig) -> SDFTDataset | FakeSDFTDataset:
 
     logger = get_logger()
     logger.info(f"Loading SDFT dataset: {config.dataset_name} (split={config.dataset_split})")
-    dataset = cast(Dataset, load_dataset(config.dataset_name, split=config.dataset_split))
+    if Path(config.dataset_name).is_dir():
+        dataset = cast(Dataset, load_from_disk(config.dataset_name))
+    else:
+        dataset = cast(Dataset, load_dataset(config.dataset_name, split=config.dataset_split))
 
     assert config.prompt_field in dataset.column_names, (
         f"Dataset must have a '{config.prompt_field}' column, found: {dataset.column_names}"

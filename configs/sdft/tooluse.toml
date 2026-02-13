@@ -41,7 +41,7 @@ type = "cosine"
 warmup_steps = 10
 
 inference_gpu_ids = [0]
-trainer_gpu_ids = [1]
+trainer_gpu_ids = [1, 2, 3]
 
 [trainer]
 max_steps = 126  # ceil(4046 / 32)

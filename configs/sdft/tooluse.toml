@@ -40,12 +40,12 @@ weight_decay = 0.0
 type = "cosine"
 warmup_steps = 10
 
+inference_gpu_ids = [0]
+trainer_gpu_ids = [1]
+
 [trainer]
 max_steps = 126  # ceil(4046 / 32)
 output_dir = "outputs/sdft-tooluse"
-
-inference_gpu_ids = [0]
-trainer_gpu_ids = [1]
 
 [inference.model]
 max_model_len = 4096

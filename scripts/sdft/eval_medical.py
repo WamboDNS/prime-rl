@@ -56,7 +56,7 @@ def main():
     parser.add_argument("--base-url", type=str, default="http://localhost:8000/v1", help="vLLM API base URL")
     parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-7B-Instruct", help="Model name for generation")
     parser.add_argument("--max-tokens", type=int, default=2048, help="Max tokens to generate")
-    parser.add_argument("--judge-model", type=str, default="gpt-5-mini", help="Model for judging")
+    parser.add_argument("--judge-model", type=str, default="openai/gpt-5-mini", help="Model for judging")
     parser.add_argument("--judge-api-key", type=str, default=None, help="API key for judge (defaults to PRIME_API_KEY env var)")
     parser.add_argument("--judge-base-url", type=str, default="https://api.primeintellect.ai/v1", help="API base URL for judge")
     parser.add_argument("--label", type=str, default=None, help="Label for this run")

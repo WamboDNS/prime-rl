@@ -71,14 +71,43 @@ def broadcast_weights_to_inference(model, output_dir, step, world):
 def ema_sync(ref_model, student_model, alpha):
     """Sync reference model with student: ref = alpha*student + (1-alpha)*ref.
 
-    Both models are FSDP-wrapped with identical sharding, so we operate on
-    local shards directly — no all-gather needed.
+    Handles mixed replicated/sharded parameter layouts by preferring local
+    tensors and falling back to gathered student tensors only when needed.
     """
+    def local_tensor_or_self(tensor):
+        if hasattr(tensor, "to_local"):
+            return tensor.to_local()
+        if hasattr(tensor, "_local_tensor"):
+            return tensor._local_tensor
+        return tensor
+
+    student_params = dict(student_model.named_parameters())
     with torch.no_grad():
-        for ref_param, student_param in zip(ref_model.parameters(), student_model.parameters()):
-            ref_local = ref_param.data._local_tensor if hasattr(ref_param.data, "_local_tensor") else ref_param.data
-            student_local = student_param.data._local_tensor if hasattr(student_param.data, "_local_tensor") else student_param.data
-            ref_local.mul_(1 - alpha).add_(student_local, alpha=alpha)
+        for name, ref_param in ref_model.named_parameters():
+            if name not in student_params:
+                raise RuntimeError(f"EMA missing student parameter: {name}")
+
+            student_param = student_params[name]
+            ref_local = local_tensor_or_self(ref_param.data)
+            student_local = local_tensor_or_self(student_param.data)
+
+            if student_local.shape == ref_local.shape:
+                student_tensor = student_local
+            elif hasattr(student_param.data, "full_tensor"):
+                student_full = student_param.data.full_tensor()
+                if student_full.shape != ref_local.shape:
+                    raise RuntimeError(
+                        f"EMA shape mismatch for {name}: ref={tuple(ref_local.shape)} "
+                        f"student_local={tuple(student_local.shape)} student_full={tuple(student_full.shape)}"
+                    )
+                student_tensor = student_full
+            else:
+                raise RuntimeError(
+                    f"EMA shape mismatch for {name}: ref={tuple(ref_local.shape)} "
+                    f"student={tuple(student_local.shape)}"
+                )
+
+            ref_local.mul_(1 - alpha).add_(student_tensor, alpha=alpha)
 
 
 @clean_exit

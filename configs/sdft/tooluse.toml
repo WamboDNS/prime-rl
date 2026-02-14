@@ -15,7 +15,7 @@ dataset_name = "data/tooluse_sdft"  # output of prepare_tooluse.py
 prompt_field = "prompt"
 teacher_prompt_field = "teacher_prompt"
 batch_size = 32
-micro_batch_size = 8
+micro_batch_size = 4
 
 [trainer.loss]
 alpha = 0.0  # forward KL
@@ -23,7 +23,9 @@ temperature = 1.0
 num_loss_tokens_to_skip = 3
 
 [trainer.ref_model]
-enabled = false
+enabled = true
+sync_steps = 1
+mixup_alpha = 0.01
 
 [trainer.generation]
 generate_from_teacher = false

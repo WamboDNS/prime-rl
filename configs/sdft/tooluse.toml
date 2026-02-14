@@ -23,9 +23,7 @@ temperature = 1.0
 num_loss_tokens_to_skip = 3
 
 [trainer.ref_model]
-enabled = true
-sync_steps = 1
-mixup_alpha = 0.01
+enabled = false
 
 [trainer.generation]
 generate_from_teacher = false

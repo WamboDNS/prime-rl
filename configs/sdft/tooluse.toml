@@ -4,7 +4,7 @@
 # Usage: uv run sdft @ configs/sdft/tooluse.toml
 
 inference_gpu_ids = [0]
-trainer_gpu_ids = [1, 2, 3]
+trainer_gpu_ids = [1]
 
 [trainer.model]
 name = "Qwen/Qwen2.5-7B-Instruct"
@@ -15,7 +15,7 @@ dataset_name = "data/tooluse_sdft"  # output of prepare_tooluse.py
 prompt_field = "prompt"
 teacher_prompt_field = "teacher_prompt"
 batch_size = 32
-micro_batch_size = 16
+micro_batch_size = 32
 
 [trainer.loss]
 alpha = 0.0  # forward KL

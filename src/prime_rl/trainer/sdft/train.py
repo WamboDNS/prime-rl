@@ -68,11 +68,21 @@ def broadcast_weights_to_inference(model, output_dir, step, world):
     dist.barrier()
 
 
+def _to_local(param):
+    """Get the local tensor from a DTensor or regular parameter."""
+    t = param.data
+    if hasattr(t, "to_local"):
+        return t.to_local()
+    return t
+
+
 def ema_sync(ref_model, student_model, alpha):
     """Sync reference model with student: ref = alpha*student + (1-alpha)*ref."""
     with torch.no_grad():
         for ref_param, student_param in zip(ref_model.parameters(), student_model.parameters()):
-            ref_param.data.mul_(1 - alpha).add_(student_param.data, alpha=alpha)
+            ref_local = _to_local(ref_param)
+            student_local = _to_local(student_param)
+            ref_local.mul_(1 - alpha).add_(student_local, alpha=alpha)
 
 
 @clean_exit

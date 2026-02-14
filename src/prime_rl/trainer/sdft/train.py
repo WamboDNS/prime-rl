@@ -69,13 +69,19 @@ def broadcast_weights_to_inference(model, output_dir, step, world):
 
 
 def ema_sync(ref_model, student_model, alpha):
-    """Sync reference model with student: ref = alpha*student + (1-alpha)*ref."""
+    """Sync reference model with student: ref = alpha*student + (1-alpha)*ref.
+
+    Operates on raw underlying tensors to avoid DTensor dispatch issues
+    when ref params are replicated and student params are FSDP-sharded.
+    """
     with torch.no_grad():
         for ref_param, student_param in zip(ref_model.parameters(), student_model.parameters()):
-            student_data = student_param.data
-            if hasattr(student_data, "full_tensor"):
-                student_data = student_data.full_tensor()
-            ref_param.data.mul_(1 - alpha).add_(student_data, alpha=alpha)
+            ref_raw = ref_param.data._local_tensor if hasattr(ref_param.data, "_local_tensor") else ref_param.data
+            if hasattr(student_param.data, "full_tensor"):
+                student_raw = student_param.data.full_tensor()
+            else:
+                student_raw = student_param.data
+            ref_raw.mul_(1 - alpha).add_(student_raw, alpha=alpha)
 
 
 @clean_exit

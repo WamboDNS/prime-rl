@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shutil
 import time
 from datetime import timedelta
 
@@ -57,7 +58,10 @@ async def generate_completions(
 
 
 def broadcast_weights_to_inference(model, output_dir, step, world):
-    """Save model weights to filesystem so the inference server can pick them up."""
+    """Save model weights to filesystem so the inference server can pick them up.
+
+    Cleans up the previous broadcast to avoid filling the disk.
+    """
     broadcast_dir = get_broadcast_dir(output_dir)
     state_dict = gather_weights_on_master(model, is_master=world.is_master)
     if world.is_master:
@@ -65,6 +69,10 @@ def broadcast_weights_to_inference(model, output_dir, step, world):
         save_state_dict(state_dict, step_path)
         # Write a marker file so the inference server knows new weights are available
         (broadcast_dir / "latest_step.txt").write_text(str(step))
+        # Clean up previous broadcasts to avoid filling the disk
+        for old_dir in broadcast_dir.iterdir():
+            if old_dir.is_dir() and old_dir != step_path:
+                shutil.rmtree(old_dir)
     dist.barrier()
 
 

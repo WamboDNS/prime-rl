@@ -40,8 +40,13 @@ async def generate_completions(
     temperature: float,
     top_p: float,
     top_k: int,
-) -> list[str]:
-    """Generate completions from the inference server using the OpenAI API."""
+) -> tuple[list[str], list[list[float]]]:
+    """Generate completions from the inference server using the OpenAI API.
+
+    Returns:
+        Tuple of (completions, per_token_logprobs) where per_token_logprobs[i]
+        contains the logprob of each sampled token in completion i.
+    """
     tasks = []
     for prompt in prompts:
         task = client.chat.completions.create(
@@ -51,10 +56,16 @@ async def generate_completions(
             temperature=temperature,
             top_p=top_p,
             extra_body={"top_k": top_k},
+            logprobs=True,
         )
         tasks.append(task)
     responses = await asyncio.gather(*tasks)
-    return [r.choices[0].message.content or "" for r in responses]
+    completions = [r.choices[0].message.content or "" for r in responses]
+    sampling_logprobs = [
+        [lp.logprob for lp in r.choices[0].logprobs.content] if r.choices[0].logprobs and r.choices[0].logprobs.content else []
+        for r in responses
+    ]
+    return completions, sampling_logprobs
 
 
 def broadcast_weights_to_inference(model, output_dir, step, world):
@@ -236,7 +247,7 @@ def train(config: SDFTTrainerConfig):
             # Generate completions from inference server (only rank 0, then broadcast)
             if world.is_master:
                 logger.info(f"Generating {len(gen_prompts)} completions...")
-                completions = asyncio.get_event_loop().run_until_complete(
+                completions, sampling_logprobs = asyncio.get_event_loop().run_until_complete(
                     generate_completions(
                         client=client,
                         prompts=gen_prompts,
@@ -249,13 +260,14 @@ def train(config: SDFTTrainerConfig):
                 )
             else:
                 completions = None
+                sampling_logprobs = None
 
-            # Broadcast completions to all ranks
+            # Broadcast completions and sampling logprobs to all ranks
             if world.world_size > 1:
                 import pickle
 
                 if world.is_master:
-                    data = pickle.dumps(completions)
+                    data = pickle.dumps((completions, sampling_logprobs))
                     size_tensor = torch.tensor([len(data)], dtype=torch.long, device="cuda")
                 else:
                     size_tensor = torch.tensor([0], dtype=torch.long, device="cuda")
@@ -268,7 +280,7 @@ def train(config: SDFTTrainerConfig):
                 dist.broadcast(data_tensor, src=0)
 
                 if not world.is_master:
-                    completions = pickle.loads(data_tensor.cpu().numpy().tobytes())
+                    completions, sampling_logprobs = pickle.loads(data_tensor.cpu().numpy().tobytes())
 
             gen_time = time.perf_counter() - step_start_time
             logger.debug(f"Generation took {gen_time:.2f}s, avg completion length: {sum(len(c) for c in completions) / len(completions):.0f} chars")
@@ -282,7 +294,30 @@ def train(config: SDFTTrainerConfig):
                 max_prompt_length=config.generation.max_prompt_length,
                 max_completion_length=config.generation.max_completion_length,
                 num_loss_tokens_to_skip=config.loss.num_loss_tokens_to_skip,
+                sampling_logprobs=sampling_logprobs if config.loss.importance_sampling else None,
             )
+
+            # Compute old_per_token_logps for importance sampling correction
+            if config.loss.importance_sampling:
+                with torch.no_grad():
+                    input_ids = train_batch["student_input_ids"].to("cuda")
+                    position_ids = train_batch["student_position_ids"].to("cuda")
+                    old_out = forward(model, input_ids, position_ids)
+                    old_logprobs = old_out["logits"].log_softmax(dim=-1)
+                    # Gather logprobs at the actual token positions (shifted by 1 for next-token prediction)
+                    # For token at position t, the logprob comes from the model output at position t-1
+                    shifted_ids = input_ids[:, 1:]  # [batch, seq-1]
+                    shifted_logprobs = old_logprobs[:, :-1, :]  # [batch, seq-1, vocab]
+                    old_per_token_logps = shifted_logprobs.gather(
+                        dim=-1, index=shifted_ids.unsqueeze(-1)
+                    ).squeeze(-1)  # [batch, seq-1]
+                    # Pad back to full sequence length (position 0 has no predecessor)
+                    old_per_token_logps = torch.cat(
+                        [torch.zeros(old_per_token_logps.shape[0], 1, device="cuda"), old_per_token_logps],
+                        dim=1,
+                    )
+                    train_batch["old_per_token_logps"] = old_per_token_logps.cpu()
+                    del old_out, old_logprobs, shifted_logprobs
 
             # Split into micro-batches for gradient accumulation
             buffer = []
@@ -308,6 +343,8 @@ def train(config: SDFTTrainerConfig):
         train_step_start = time.perf_counter()
         batch_loss = torch.tensor(0.0, device="cuda")
         batch_kl = torch.tensor(0.0, device="cuda")
+        batch_is_mean = torch.tensor(0.0, device="cuda")
+        batch_is_max = torch.tensor(0.0, device="cuda")
 
         for micro_step in range(grad_accum_steps):
             if buffer_idx >= len(buffer):
@@ -352,6 +389,21 @@ def train(config: SDFTTrainerConfig):
                     teacher_comp_logits, aligned_mask, config.loss.top_entropy_quantile
                 )
 
+            # Compute importance sampling weights
+            importance_weights = None
+            if config.loss.importance_sampling:
+                sampling_lps = _extract_completion_values(
+                    micro_batch["sampling_logprobs"].to("cuda"), completion_mask
+                )
+                old_lps = _extract_completion_values(
+                    micro_batch["old_per_token_logps"].to("cuda"), completion_mask
+                )
+                ratio = torch.exp(old_lps - sampling_lps).clamp(max=config.loss.importance_sampling_cap)
+                importance_weights = (ratio * aligned_mask).sum(-1) / aligned_mask.sum(-1).clamp(min=1)
+                importance_weights = importance_weights.unsqueeze(-1)
+                batch_is_mean += importance_weights.mean().detach() / grad_accum_steps
+                batch_is_max = torch.max(batch_is_max, importance_weights.max().detach())
+
             # Compute KL loss
             loss, metrics = sdft_kl_loss(
                 student_comp_logits,
@@ -359,6 +411,7 @@ def train(config: SDFTTrainerConfig):
                 aligned_mask,
                 alpha=config.loss.alpha,
                 temperature=config.loss.temperature,
+                importance_weights=importance_weights,
             )
 
             batch_loss += loss.detach() / grad_accum_steps
@@ -404,18 +457,19 @@ def train(config: SDFTTrainerConfig):
         )
         logger.success(step_message)
 
-        monitor.log(
-            {
-                "loss/kl": batch_loss.item(),
-                "loss/kl_divergence": batch_kl.item(),
-                "optim/lr": current_lr,
-                "optim/grad_norm": grad_norm.item(),
-                "perf/peak_memory": peak_memory,
-                "time/step": step_time,
-                "step": progress.step,
-            },
-            step=progress.step,
-        )
+        log_dict = {
+            "loss/kl": batch_loss.item(),
+            "loss/kl_divergence": batch_kl.item(),
+            "optim/lr": current_lr,
+            "optim/grad_norm": grad_norm.item(),
+            "perf/peak_memory": peak_memory,
+            "time/step": step_time,
+            "step": progress.step,
+        }
+        if config.loss.importance_sampling:
+            log_dict["is/weight_mean"] = batch_is_mean.item()
+            log_dict["is/weight_max"] = batch_is_max.item()
+        monitor.log(log_dict, step=progress.step)
 
         progress.step += 1
 
@@ -451,6 +505,29 @@ def _extract_completion_logits(logits: torch.Tensor, completion_mask: torch.Tens
         comp_indices = completion_mask[i].nonzero(as_tuple=True)[0]
         n = comp_indices.shape[0]
         result[i, :n] = logits[i, comp_indices]
+    return result
+
+
+def _extract_completion_values(values: torch.Tensor, completion_mask: torch.Tensor) -> torch.Tensor:
+    """Extract per-token values at completion positions into a dense tensor.
+
+    Args:
+        values: [batch, seq]
+        completion_mask: [batch, seq] bool
+
+    Returns:
+        [batch, max_comp_len] with zero-padding where needed.
+    """
+    batch_size = values.shape[0]
+    max_comp_len = completion_mask.sum(dim=-1).max().item()
+    if max_comp_len == 0:
+        return values[:, :1]
+
+    result = torch.zeros(batch_size, max_comp_len, device=values.device, dtype=values.dtype)
+    for i in range(batch_size):
+        comp_indices = completion_mask[i].nonzero(as_tuple=True)[0]
+        n = comp_indices.shape[0]
+        result[i, :n] = values[i, comp_indices]
     return result
 
 

@@ -29,6 +29,7 @@ class SDFTTrainBatch(TypedDict):
     completion_mask: Tensor  # [batch, seq] (aligned with student)
     teacher_completion_mask: Tensor  # [batch, seq] (aligned with teacher)
     labels: Tensor  # [batch, seq] target token ids
+    sampling_logprobs: Tensor  # [batch, seq] per-token logprobs from vLLM sampler
 
 
 class SDFTDataset(IterableDataset):
@@ -151,6 +152,7 @@ def prepare_sdft_batch(
     max_prompt_length: int,
     max_completion_length: int,
     num_loss_tokens_to_skip: int = 0,
+    sampling_logprobs: list[list[float]] | None = None,
 ) -> SDFTTrainBatch:
     """Tokenize dual prompts + shared completions into padded training tensors.
 
@@ -165,6 +167,7 @@ def prepare_sdft_batch(
     all_student_ids = []
     all_teacher_ids = []
     all_completion_lengths = []
+    all_sampling_logprobs: list[list[float]] = []
 
     for i in range(batch_size):
         # Apply chat template to prompts (matches how vLLM processes them during generation)
@@ -191,6 +194,10 @@ def prepare_sdft_batch(
         all_student_ids.append(student_prompt_ids + completion_ids)
         all_teacher_ids.append(teacher_prompt_ids + completion_ids)
         all_completion_lengths.append(len(completion_ids))
+
+        if sampling_logprobs is not None:
+            # Truncate sampling logprobs to match completion_ids length
+            all_sampling_logprobs.append(sampling_logprobs[i][: len(completion_ids)])
 
     # Pad to max length in batch (left-pad prompts, right-pad after completion)
     max_student_len = max(len(ids) for ids in all_student_ids)
@@ -236,6 +243,17 @@ def prepare_sdft_batch(
             t_start = max_teacher_len - comp_len + num_loss_tokens_to_skip
             teacher_completion_mask[i, t_start:] = True
 
+    # Build sampling logprobs tensor aligned with student sequence
+    sampling_logprobs_tensor = torch.zeros(batch_size, max_student_len, dtype=torch.float32)
+    if all_sampling_logprobs:
+        for i in range(batch_size):
+            lps = all_sampling_logprobs[i]
+            comp_len = all_completion_lengths[i]
+            n = min(len(lps), comp_len)
+            if n > 0:
+                start = max_student_len - comp_len
+                sampling_logprobs_tensor[i, start : start + n] = torch.tensor(lps[:n], dtype=torch.float32)
+
     return SDFTTrainBatch(
         student_input_ids=student_input_ids,
         student_position_ids=student_position_ids,
@@ -244,4 +262,5 @@ def prepare_sdft_batch(
         completion_mask=student_completion_mask,
         teacher_completion_mask=teacher_completion_mask,
         labels=student_labels,
+        sampling_logprobs=sampling_logprobs_tensor,
     )

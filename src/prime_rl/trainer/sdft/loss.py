@@ -10,6 +10,7 @@ def sdft_kl_loss(
     completion_mask: Bool[Tensor, "batch seq"],
     alpha: float = 0.0,
     temperature: float = 1.0,
+    importance_weights: Float[Tensor, "batch 1"] | None = None,
 ) -> tuple[Float[Tensor, ""], dict[str, Tensor]]:
     """Full-vocabulary KL divergence between student and teacher distributions.
 
@@ -42,6 +43,9 @@ def sdft_kl_loss(
         kl_mix_teacher = (teacher_probs * (teacher_logprobs - mix_logprobs)).sum(dim=-1)
         kl_mix_student = (student_probs * (student_logprobs - mix_logprobs)).sum(dim=-1)
         per_token_kl = alpha * kl_mix_teacher + (1 - alpha) * kl_mix_student
+
+    if importance_weights is not None:
+        per_token_kl = per_token_kl * importance_weights
 
     # Mean over completion tokens, then mean over batch
     num_tokens = completion_mask.sum(dim=-1).clamp(min=1)

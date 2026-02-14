@@ -39,6 +39,16 @@ class SDFTLossConfig(BaseConfig):
         Field(ge=0, description="Skip first N completion tokens in the loss."),
     ] = 0
 
+    importance_sampling: Annotated[
+        bool,
+        Field(description="Correct for distribution mismatch between vLLM sampler and training model."),
+    ] = True
+
+    importance_sampling_cap: Annotated[
+        float,
+        Field(gt=0.0, description="Truncation cap for per-token importance ratio."),
+    ] = 2.0
+
 
 class SDFTRefModelConfig(BaseConfig):
     """Configures the optional EMA reference model for SDFT."""

@@ -58,7 +58,7 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=2048, help="Max tokens to generate")
     parser.add_argument("--judge-model", type=str, default="openai/gpt-5-mini", help="Model for judging")
     parser.add_argument("--judge-api-key", type=str, default=None, help="API key for judge (defaults to PRIME_API_KEY env var)")
-    parser.add_argument("--judge-base-url", type=str, default="https://api.primeintellect.ai/v1", help="API base URL for judge")
+    parser.add_argument("--judge-base-url", type=str, default="https://api.pinference.ai/api/v1", help="API base URL for judge")
     parser.add_argument("--label", type=str, default=None, help="Label for this run")
     parser.add_argument("--output", type=str, default=None, help="Path to save JSON results")
     parser.add_argument("--report-token-stats", action="store_true", help="Report average completion token count")

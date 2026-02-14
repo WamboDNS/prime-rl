@@ -43,6 +43,9 @@ weight_decay = 0.0
 type = "cosine"
 warmup_steps = 10
 
+[trainer.log]
+level = "DEBUG"
+
 [trainer.ckpt]
 interval = 50
 

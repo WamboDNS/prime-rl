@@ -238,7 +238,7 @@ def train(config: SDFTTrainerConfig):
                     completions = pickle.loads(data_tensor.cpu().numpy().tobytes())
 
             gen_time = time.perf_counter() - step_start_time
-            logger.debug(f"Generation took {gen_time:.2f}s")
+            logger.debug(f"Generation took {gen_time:.2f}s, avg completion length: {sum(len(c) for c in completions) / len(completions):.0f} chars")
 
             # Tokenize and prepare training batch
             train_batch = prepare_sdft_batch(
@@ -265,6 +265,8 @@ def train(config: SDFTTrainerConfig):
                 buffer = buffer * config.generation.num_iterations
 
             buffer_idx = 0
+
+            logger.debug(f"Batch shapes: student={train_batch['student_input_ids'].shape}, teacher={train_batch['teacher_input_ids'].shape}, completion_tokens={train_batch['completion_mask'].sum().item()}")
 
             # Broadcast weights to inference server after generation
             broadcast_weights_to_inference(model, config.output_dir, progress.step, world)
@@ -297,6 +299,8 @@ def train(config: SDFTTrainerConfig):
             with torch.no_grad():
                 teacher_out = forward(teacher_model, teacher_input_ids, teacher_position_ids)
                 teacher_logits = teacher_out["logits"]
+
+            logger.debug(f"Micro-step {micro_step}: student_logits={student_logits.shape}, teacher_logits={teacher_logits.shape}")
 
             # Align logits to completion tokens
             # Student logits shape: [batch, student_seq, vocab]
@@ -346,6 +350,7 @@ def train(config: SDFTTrainerConfig):
         # Optional EMA sync
         if ref_model is not None and (progress.step + 1) % config.ref_model.sync_steps == 0:
             ema_sync(ref_model, model, config.ref_model.mixup_alpha)
+            logger.debug(f"EMA sync at step {progress.step + 1} (alpha={config.ref_model.mixup_alpha})")
 
         # Synchronize metrics
         dist.all_reduce(batch_loss, op=dist.ReduceOp.AVG)

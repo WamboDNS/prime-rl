@@ -1,7 +1,7 @@
-# Tool Use SDFT — Self-Distillation paper reproduction
-# Paper: arxiv.org/abs/2601.19897
-# Target: Base 42.9% → SDFT 70.6% accuracy
-# Usage: uv run sdft @ configs/sdft/tooluse.toml
+# Science Q&A SDFT — Self-Distillation paper reproduction
+# Dataset: SciKnowEval Chemistry L3 (~150-300 train after filtering)
+# Usage: uv run sdft @ configs/sdft/science.toml
+# NOTE: update max_steps after running prepare_science.py
 
 inference_gpu_ids = [0]
 trainer_gpu_ids = [1, 2, 3]
@@ -11,7 +11,7 @@ name = "Qwen/Qwen2.5-7B-Instruct"
 fused_lm_head_chunk_size = "disabled"
 
 [trainer.data]
-dataset_name = "data/tooluse_sdft"  # output of prepare_tooluse.py
+dataset_name = "data/science_sdft"
 prompt_field = "prompt"
 teacher_prompt_field = "teacher_prompt"
 batch_size = 32
@@ -41,7 +41,7 @@ weight_decay = 0.0
 
 [trainer.scheduler]
 type = "cosine"
-warmup_steps = 13  # 10% of max_steps (paper uses warmup_ratio=0.1)
+warmup_steps = 1  # 10% of max_steps (paper uses warmup_ratio=0.1) — update with max_steps
 
 [trainer.log]
 level = "DEBUG"
@@ -50,11 +50,11 @@ level = "DEBUG"
 interval = 50
 
 [trainer.wandb]
-project = "sdft-tooluse"
+project = "sdft-science"
 
 [trainer]
-max_steps = 126  # ceil(4046 / 32)
-output_dir = "outputs/sdft-tooluse"
+max_steps = 10  # placeholder — update after data prep: ceil(N / 32)
+output_dir = "outputs/sdft-science"
 
 [inference.model]
 max_model_len = 4096

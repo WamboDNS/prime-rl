@@ -1,7 +1,6 @@
-# Tool Use SDFT — Self-Distillation paper reproduction
-# Paper: arxiv.org/abs/2601.19897
-# Target: Base 42.9% → SDFT 70.6% accuracy
-# Usage: uv run sdft @ configs/sdft/tooluse.toml
+# Medical SDFT — Self-Distillation paper reproduction
+# Dataset: HuatuoGPT-o1 English (~18.7k train)
+# Usage: uv run sdft @ configs/sdft/medical.toml
 
 inference_gpu_ids = [0]
 trainer_gpu_ids = [1, 2, 3]
@@ -11,7 +10,7 @@ name = "Qwen/Qwen2.5-7B-Instruct"
 fused_lm_head_chunk_size = "disabled"
 
 [trainer.data]
-dataset_name = "data/tooluse_sdft"  # output of prepare_tooluse.py
+dataset_name = "data/medical_sdft"
 prompt_field = "prompt"
 teacher_prompt_field = "teacher_prompt"
 batch_size = 32
@@ -29,7 +28,7 @@ mixup_alpha = 0.01
 
 [trainer.generation]
 generate_from_teacher = false
-max_completion_length = 1024
+max_completion_length = 2048
 max_prompt_length = 1024
 temperature = 1.0
 num_iterations = 1
@@ -41,7 +40,7 @@ weight_decay = 0.0
 
 [trainer.scheduler]
 type = "cosine"
-warmup_steps = 13  # 10% of max_steps (paper uses warmup_ratio=0.1)
+warmup_steps = 59  # 10% of max_steps (paper uses warmup_ratio=0.1)
 
 [trainer.log]
 level = "DEBUG"
@@ -50,11 +49,11 @@ level = "DEBUG"
 interval = 50
 
 [trainer.wandb]
-project = "sdft-tooluse"
+project = "sdft-medical"
 
 [trainer]
-max_steps = 126  # ceil(4046 / 32)
-output_dir = "outputs/sdft-tooluse"
+max_steps = 585  # ceil(18700 / 32)
+output_dir = "outputs/sdft-medical"
 
 [inference.model]
 max_model_len = 4096

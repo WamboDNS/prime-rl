@@ -73,7 +73,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42, help="Shuffle seed")
     parser.add_argument("--api-key", type=str, default=None, help="API key (defaults to PRIME_API_KEY env var)")
     parser.add_argument("--api-base-url", type=str, default="https://api.primeintellect.ai/v1", help="API base URL")
-    parser.add_argument("--demo-model", type=str, default="openai/gpt-4o", help="Model for generating demos")
+    parser.add_argument("--demo-model", type=str, default="openai/gpt-4.1-mini", help="Model for generating demos")
     parser.add_argument("--num-samples", type=int, default=8, help="Max attempts per question for demo generation")
     args = parser.parse_args()
 

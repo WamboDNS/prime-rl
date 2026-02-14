@@ -15,7 +15,7 @@ dataset_name = "data/tooluse_sdft"  # output of prepare_tooluse.py
 prompt_field = "prompt"
 teacher_prompt_field = "teacher_prompt"
 batch_size = 32
-micro_batch_size = 4
+micro_batch_size = 16
 
 [trainer.loss]
 alpha = 0.0  # forward KL

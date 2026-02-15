@@ -29,11 +29,11 @@ def sdft_kl_loss(
     teacher_logprobs = (teacher_logits / temperature).log_softmax(dim=-1)
 
     if alpha == 0.0:
-        # Forward KL: KL(student || teacher) = sum_x student(x) * (log student(x) - log teacher(x))
-        per_token_kl = _forward_kl(student_logprobs, teacher_logprobs)
-    elif alpha == 1.0:
-        # Reverse KL: KL(teacher || student) = sum_x teacher(x) * (log teacher(x) - log student(x))
+        # Forward KL: KL(teacher || student) = sum_x teacher(x) * (log teacher(x) - log student(x))
         per_token_kl = _forward_kl(teacher_logprobs, student_logprobs)
+    elif alpha == 1.0:
+        # Reverse KL: KL(student || teacher) = sum_x student(x) * (log student(x) - log teacher(x))
+        per_token_kl = _forward_kl(student_logprobs, teacher_logprobs)
     else:
         # Jensen-Shannon Divergence
         student_probs = student_logprobs.exp()

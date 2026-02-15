@@ -21,7 +21,7 @@ class SDFTLossConfig(BaseConfig):
 
     alpha: Annotated[
         float,
-        Field(ge=0.0, le=1.0, description="KL direction: 0=forward KL, 1=reverse KL, (0,1)=JSD."),
+        Field(ge=0.0, le=1.0, description="KL direction: 0=forward KL(teacher||student), 1=reverse KL(student||teacher), (0,1)=JSD."),
     ] = 0.0
 
     temperature: Annotated[

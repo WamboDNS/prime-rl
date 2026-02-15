@@ -241,6 +241,11 @@ class SDFTTrainerConfig(BaseSettings):
         Field(description="Number of passes over the dataset."),
     ] = 100
 
+    snapshot_hours: Annotated[
+        list[float],
+        Field(description="Wall-clock hours at which to save weight snapshots."),
+    ] = [1.0, 5.0]
+
     dist_timeout_seconds: Annotated[
         int,
         Field(description="Timeout in seconds for torch distributed ops."),

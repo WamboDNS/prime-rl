@@ -359,6 +359,9 @@ def train(config: SDFTTrainerConfig):
 
     logger.info(f"Starting training loop (max_steps={max_steps or 'infinite'})")
     max_memory = torch.cuda.mem_get_info()[1] / 1024**3
+    train_start_time = time.perf_counter()
+    snapshot_hours = sorted(config.snapshot_hours)
+    next_snapshot_idx = 0
 
     buffer = []
     buffer_idx = 0
@@ -695,11 +698,14 @@ def train(config: SDFTTrainerConfig):
         dist.all_reduce(batch_kl, op=dist.ReduceOp.AVG)
 
         step_time = time.perf_counter() - train_step_start
+        elapsed = time.perf_counter() - train_start_time
+        elapsed_h = elapsed / 3600
         peak_memory = torch.cuda.max_memory_reserved() / 1024**3
 
         step_message = (
             f"Step {progress.step} | "
             f"Time: {step_time:.2f}s | "
+            f"Elapsed: {elapsed_h:.2f}h | "
             f"KL Loss: {batch_loss.item():.4f} | "
             f"KL Div: {batch_kl.item():.4f} | "
             f"Grad Norm: {grad_norm:.4f} | "
@@ -715,12 +721,24 @@ def train(config: SDFTTrainerConfig):
             "optim/grad_norm": grad_norm.item(),
             "perf/peak_memory": peak_memory,
             "time/step": step_time,
+            "time/elapsed_hours": elapsed_h,
             "step": progress.step,
         }
         if needs_is:
             log_dict["is/weight_mean"] = batch_is_mean.item()
             log_dict["is/weight_max"] = batch_is_max.item()
         monitor.log(log_dict, step=progress.step)
+
+        # Time-based snapshots
+        if (
+            next_snapshot_idx < len(snapshot_hours)
+            and elapsed_h >= snapshot_hours[next_snapshot_idx]
+            and weight_ckpt_manager is not None
+        ):
+            hour_tag = snapshot_hours[next_snapshot_idx]
+            logger.info(f"Saving {hour_tag}h snapshot at step {progress.step} ({elapsed_h:.2f}h elapsed)")
+            weight_ckpt_manager.save(progress.step, model, tokenizer)
+            next_snapshot_idx += 1
 
         progress.step += 1
 

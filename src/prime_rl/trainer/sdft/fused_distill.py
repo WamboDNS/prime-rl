@@ -100,16 +100,14 @@ class _ChunkedStudentGatherFn(torch.autograd.Function):
         vocab = weight.shape[0]
         K = topk_indices.shape[1]
         device = hidden.device
-        # Use at least float32, but preserve float64 for numerical tests
-        compute_dtype = torch.float64 if hidden.dtype == torch.float64 else torch.float32
 
-        gathered = torch.zeros((n, K), device=device, dtype=compute_dtype)
-        m = torch.full((n,), float("-inf"), device=device, dtype=compute_dtype)
-        s = torch.zeros((n,), device=device, dtype=compute_dtype)
+        gathered = torch.zeros((n, K), device=device, dtype=torch.float32)
+        m = torch.full((n,), float("-inf"), device=device, dtype=torch.float32)
+        s = torch.zeros((n,), device=device, dtype=torch.float32)
 
         for start in range(0, vocab, chunk_size):
             end = min(start + chunk_size, vocab)
-            logits = (hidden @ weight[start:end].t()).to(compute_dtype)  # [N, C]
+            logits = (hidden @ weight[start:end].t()).float()  # [N, C]
 
             m, s = _online_logsumexp(m, s, logits)
 
@@ -135,12 +133,11 @@ class _ChunkedStudentGatherFn(torch.autograd.Function):
 
         n, h = hidden.shape
         vocab = weight.shape[0]
-        compute_dtype = torch.float64 if hidden.dtype == torch.float64 else torch.float32
 
         grad_hidden = torch.zeros_like(hidden)
         grad_weight = torch.zeros_like(weight)
 
-        g = grad_output.to(compute_dtype)
+        g = grad_output.float()
 
         # Sum of gradients for the normalization term: each position contributes -p * sum(grad)
         g_sum = g.sum(dim=-1)  # [N]
@@ -148,7 +145,7 @@ class _ChunkedStudentGatherFn(torch.autograd.Function):
         for start in range(0, vocab, chunk_size):
             end = min(start + chunk_size, vocab)
             w_chunk = weight[start:end]
-            logits = (hidden @ w_chunk.t()).to(compute_dtype)  # [N, C]
+            logits = (hidden @ w_chunk.t()).float()  # [N, C]
 
             p = torch.exp(logits - logZ.unsqueeze(-1))  # [N, C] softmax chunk
 

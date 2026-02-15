@@ -81,21 +81,28 @@ def test_student_gather_matches_naive():
 
 
 def test_student_gather_gradient():
+    """Verify backward produces correct gradients by comparing against naive autograd."""
     torch.manual_seed(42)
     N, H, V, K = 4, 8, 32, 5
-    hidden = torch.randn(N, H, requires_grad=True, dtype=torch.float64)
-    weight = torch.randn(V, H, requires_grad=True, dtype=torch.float64)
 
-    # Random but valid indices
+    hidden_data = torch.randn(N, H)
+    weight_data = torch.randn(V, H)
     topk_idx = torch.randint(0, V, (N, K))
 
-    torch.autograd.gradcheck(
-        lambda h, w: _ChunkedStudentGatherFn.apply(h, w, topk_idx, 7),
-        (hidden, weight),
-        eps=1e-6,
-        atol=1e-4,
-        rtol=1e-3,
-    )
+    # Fused path
+    h_fused = hidden_data.clone().requires_grad_(True)
+    w_fused = weight_data.clone().requires_grad_(True)
+    fused_lp = _ChunkedStudentGatherFn.apply(h_fused, w_fused, topk_idx, 7)
+    fused_lp.sum().backward()
+
+    # Naive path
+    h_naive = hidden_data.clone().requires_grad_(True)
+    w_naive = weight_data.clone().requires_grad_(True)
+    naive_lp = _naive_gather_log_probs(h_naive, w_naive, topk_idx)
+    naive_lp.sum().backward()
+
+    torch.testing.assert_close(h_fused.grad, h_naive.grad, atol=1e-4, rtol=1e-4)
+    torch.testing.assert_close(w_fused.grad, w_naive.grad, atol=1e-4, rtol=1e-4)
 
 
 def test_fused_distill_topk_end_to_end():

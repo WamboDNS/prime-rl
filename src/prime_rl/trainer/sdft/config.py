@@ -17,65 +17,99 @@ from prime_rl.utils.pydantic_config import BaseConfig, BaseSettings
 
 
 class SDFTLossConfig(BaseConfig):
-    """Configures the SDFT KL divergence loss."""
+    """Configures the SDFT KL divergence loss (SDPO-style)."""
 
     alpha: Annotated[
         float,
-        Field(ge=0.0, le=1.0, description="KL direction: 0=forward KL(teacher||student), 1=reverse KL(student||teacher), (0,1)=JSD."),
-    ] = 0.0
+        Field(ge=0.0, le=1.0, description="KL direction: 0=forward KL(teacher||student), 0.5=JSD, 1=reverse KL(student||teacher)."),
+    ] = 0.5
 
-    temperature: Annotated[
-        float,
-        Field(gt=0.0, description="Softmax temperature for smoothing distributions."),
-    ] = 1.0
-
-    top_entropy_quantile: Annotated[
-        float,
-        Field(ge=0.0, le=1.0, description="Keep only top-entropy tokens. 1.0=all tokens, 0.8=top 80%."),
-    ] = 1.0
-
-    num_loss_tokens_to_skip: Annotated[
-        int,
-        Field(ge=0, description="Skip first N completion tokens in the loss."),
-    ] = 0
-
-    importance_sampling: Annotated[
+    full_logit_distillation: Annotated[
         bool,
-        Field(description="Correct for distribution mismatch between vLLM sampler and training model."),
+        Field(description="Use full-logit KL distillation (True) or sampled-token-only (False)."),
     ] = True
 
-    importance_sampling_cap: Annotated[
-        float,
-        Field(gt=0.0, description="Truncation cap for per-token importance ratio."),
+    distillation_topk: Annotated[
+        int | None,
+        Field(ge=1, description="Use top-K logits for distillation. None uses full vocabulary."),
+    ] = 100
+
+    distillation_add_tail: Annotated[
+        bool,
+        Field(description="Add tail probability bucket when using top-K distillation."),
+    ] = True
+
+    is_clip: Annotated[
+        float | None,
+        Field(gt=0.0, description="Clip value for IS ratio (π_current/π_old). None disables IS."),
     ] = 2.0
 
 
 class SDFTRefModelConfig(BaseConfig):
-    """Configures the optional EMA reference model for SDFT."""
+    """Configures the EMA teacher model for SDFT."""
 
     enabled: Annotated[
         bool,
         Field(description="Whether to use a separate EMA reference model as teacher."),
     ] = False
 
-    sync_steps: Annotated[
-        int,
-        Field(ge=1, description="Sync EMA reference model every N steps."),
-    ] = 1
-
-    mixup_alpha: Annotated[
+    update_rate: Annotated[
         float,
-        Field(gt=0.0, le=1.0, description="EMA blend: ref = alpha*student + (1-alpha)*ref."),
-    ] = 0.01
+        Field(gt=0.0, le=1.0, description="EMA blend: teacher = rate*student + (1-rate)*teacher."),
+    ] = 0.05
+
+
+class SDFTRepromptConfig(BaseConfig):
+    """Configures dynamic teacher prompt construction (SDPO-style self-distillation)."""
+
+    success_threshold: Annotated[
+        float,
+        Field(description="Minimum reward score to consider a completion successful."),
+    ] = 1.0
+
+    dont_reprompt_on_self_success: Annotated[
+        bool,
+        Field(description="Exclude a sample's own success from demonstrations (recommended True)."),
+    ] = True
+
+    remove_thinking: Annotated[
+        bool,
+        Field(description="Strip <think>...</think> from demonstrations."),
+    ] = True
+
+    max_reprompt_length: Annotated[
+        int,
+        Field(ge=1, description="Max tokens for teacher prompt (before completion)."),
+    ] = 10240
+
+    reprompt_template: Annotated[
+        str,
+        Field(description="Template for teacher prompt. Variables: {prompt}, {solution}, {feedback}."),
+    ] = "{prompt}{solution}{feedback}\n\nCorrectly solve the original question.\n"
+
+    solution_template: Annotated[
+        str,
+        Field(description="Template for solution section. Variable: {successful_previous_attempt}."),
+    ] = "\nCorrect solution:\n\n{successful_previous_attempt}\n\n"
+
+    feedback_template: Annotated[
+        str,
+        Field(description="Template for feedback section. Variable: {feedback_raw}."),
+    ] = "\nThe following is feedback from your unsuccessful earlier attempt:\n\n{feedback_raw}\n\n"
+
+    include_feedback: Annotated[
+        bool,
+        Field(description="Include environment feedback in teacher prompt."),
+    ] = False
 
 
 class SDFTGenerationConfig(BaseConfig):
     """Configures completion generation for SDFT."""
 
-    generate_from_teacher: Annotated[
-        bool,
-        Field(description="Generate completions from teacher prompt (True) or student prompt (False)."),
-    ] = False
+    num_completions: Annotated[
+        int,
+        Field(ge=1, description="Number of completions per prompt (SDPO rollout.n)."),
+    ] = 8
 
     num_iterations: Annotated[
         int,
@@ -115,7 +149,7 @@ class SDFTDataConfig(BaseConfig):
 
     dataset_name: Annotated[
         str,
-        Field(description="HuggingFace dataset name or path."),
+        Field(description="HuggingFace dataset name or local path (JSON/Parquet/disk)."),
     ] = "PrimeIntellect/Reverse-Text-SFT"
 
     dataset_split: Annotated[
@@ -125,13 +159,23 @@ class SDFTDataConfig(BaseConfig):
 
     prompt_field: Annotated[
         str,
-        Field(description="Field name for student prompt."),
+        Field(description="Field name for the prompt."),
     ] = "prompt"
 
-    teacher_prompt_field: Annotated[
+    answer_field: Annotated[
         str,
-        Field(description="Field name for teacher prompt."),
-    ] = "teacher_prompt"
+        Field(description="Field name for the ground truth answer (used for scoring)."),
+    ] = "answer"
+
+    system_field: Annotated[
+        str | None,
+        Field(description="Field name for optional system message. None to disable."),
+    ] = "system"
+
+    kind_field: Annotated[
+        str | None,
+        Field(description="Field name for task type (mcq, tooluse, code). Used by scoring. None to auto-detect."),
+    ] = "kind"
 
     shuffle: Annotated[
         bool,
@@ -140,7 +184,12 @@ class SDFTDataConfig(BaseConfig):
 
     seed: Annotated[int, Field(description="Random seed for shuffling.")] = 0
 
-    batch_size: Annotated[int, Field(ge=1, description="Number of samples per generation batch.")] = 4
+    batch_size: Annotated[int, Field(ge=1, description="Total training samples per batch (prompts × num_completions).")] = 32
+
+    mini_batch_size: Annotated[
+        int | None,
+        Field(ge=1, description="Samples per optimizer step. None defaults to batch_size. Set to 1 for per-sample updates."),
+    ] = None
 
     micro_batch_size: Annotated[int, Field(ge=1, description="Micro batch size for forward/backward.")] = 1
 
@@ -155,6 +204,7 @@ class SDFTTrainerConfig(BaseSettings):
     tokenizer: TokenizerConfig = TokenizerConfig()
     loss: SDFTLossConfig = SDFTLossConfig()
     ref_model: SDFTRefModelConfig = SDFTRefModelConfig()
+    reprompt: SDFTRepromptConfig = SDFTRepromptConfig()
     generation: SDFTGenerationConfig = SDFTGenerationConfig()
     data: SDFTDataConfig = SDFTDataConfig()
     client: ClientConfig = ClientConfig()
@@ -199,7 +249,13 @@ class SDFTTrainerConfig(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def validate_batch_divisibility(self):
-        if self.data.batch_size % self.data.micro_batch_size != 0:
-            raise ValueError("batch_size must be divisible by micro_batch_size")
+    def validate_batch_sizes(self):
+        if self.data.batch_size % self.generation.num_completions != 0:
+            raise ValueError("batch_size must be divisible by num_completions")
+        if self.data.mini_batch_size is None:
+            self.data.mini_batch_size = self.data.batch_size
+        if self.data.batch_size % self.data.mini_batch_size != 0:
+            raise ValueError("batch_size must be divisible by mini_batch_size")
+        if self.data.mini_batch_size % self.data.micro_batch_size != 0:
+            raise ValueError("mini_batch_size must be divisible by micro_batch_size")
         return self

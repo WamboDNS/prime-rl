@@ -1,0 +1,68 @@
+# SDPO Rich Feedback Experiment (LiveCodeBench v6)
+# Paper: https://arxiv.org/abs/2601.20802
+# Matches: experiments/rich_feedback/run_sdpo.sh
+#
+# Model: Qwen/Qwen3-8B
+# Key differences from generalization: alpha=1.0 (reverse KL), lr=1e-6,
+#   topk=20, mini_batch_size=1 (32 optimizer steps per batch), no warmup,
+#   teacher_update_rate=0.01
+#
+# Usage: uv run sdft @ configs/sdft/rich_feedback.toml
+
+inference_gpu_ids = [0]
+trainer_gpu_ids = [1, 2, 3]
+
+[trainer.model]
+name = "Qwen/Qwen3-8B"
+fused_lm_head_chunk_size = "disabled"
+
+[trainer.data]
+dataset_name = "datasets/lcb_v6"
+prompt_field = "prompt"
+answer_field = "answer"
+kind_field = "kind"
+batch_size = 32
+mini_batch_size = 1
+micro_batch_size = 1
+
+[trainer.loss]
+alpha = 1.0
+full_logit_distillation = true
+distillation_topk = 20
+distillation_add_tail = true
+is_clip = 2.0
+
+[trainer.ref_model]
+enabled = true
+update_rate = 0.01
+
+[trainer.generation]
+num_completions = 8
+max_completion_length = 8192
+max_prompt_length = 2048
+temperature = 1.0
+num_iterations = 1
+
+[trainer.reprompt]
+include_feedback = true
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+weight_decay = 0.01
+
+[trainer.scheduler]
+type = "constant"
+warmup_steps = 0
+
+[trainer.wandb]
+project = "SDPO-rich-feedback"
+
+[trainer]
+output_dir = "outputs/sdpo-rich-feedback"
+
+[inference.model]
+max_model_len = 18944
+
+[inference.server]
+port = 8000

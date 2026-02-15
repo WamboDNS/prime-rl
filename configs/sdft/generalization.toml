@@ -1,0 +1,65 @@
+# SDPO Generalization Experiment
+# Paper: https://arxiv.org/abs/2601.20802
+# Matches: experiments/generalization/run_sdpo_all.sh
+#
+# Datasets (override via CLI): sciknoweval/biology, sciknoweval/chemistry,
+#   sciknoweval/material, sciknoweval/physics, tooluse
+# Models (override via CLI): Qwen/Qwen3-8B, allenai/Olmo-3-7B-Instruct
+#
+# Usage: uv run sdft @ configs/sdft/generalization.toml
+# Override: uv run sdft @ configs/sdft/generalization.toml --trainer.model.name=allenai/Olmo-3-7B-Instruct --trainer.data.dataset_name=datasets/tooluse
+
+inference_gpu_ids = [0]
+trainer_gpu_ids = [1, 2, 3]
+
+[trainer.model]
+name = "Qwen/Qwen3-8B"
+fused_lm_head_chunk_size = "disabled"
+
+[trainer.data]
+dataset_name = "datasets/sciknoweval/biology"
+prompt_field = "prompt"
+answer_field = "answer"
+kind_field = "kind"
+batch_size = 32
+mini_batch_size = 32
+micro_batch_size = 1
+
+[trainer.loss]
+alpha = 0.5
+full_logit_distillation = true
+distillation_topk = 100
+distillation_add_tail = true
+is_clip = 2.0
+
+[trainer.ref_model]
+enabled = true
+update_rate = 0.05
+
+[trainer.generation]
+num_completions = 8
+max_completion_length = 8192
+max_prompt_length = 2048
+temperature = 1.0
+num_iterations = 1
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-5
+weight_decay = 0.01
+
+[trainer.scheduler]
+type = "constant"
+warmup_steps = 10
+
+[trainer.wandb]
+project = "SDPO-generalization"
+
+[trainer]
+output_dir = "outputs/sdpo-generalization"
+
+[inference.model]
+max_model_len = 18944
+
+[inference.server]
+port = 8000

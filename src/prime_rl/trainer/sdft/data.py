@@ -13,10 +13,12 @@ from prime_rl.utils.logger import get_logger
 
 
 class SDFTPromptBatch(TypedDict):
-    """A batch of dual prompts for SDFT."""
+    """A batch of prompts with ground truth answers for SDFT."""
 
-    student_prompts: list[str]
-    teacher_prompts: list[str]
+    prompts: list[str]
+    answers: list[str]
+    systems: list[str | None]
+    kinds: list[str | None]
 
 
 class SDFTTrainBatch(TypedDict):
@@ -29,17 +31,19 @@ class SDFTTrainBatch(TypedDict):
     completion_mask: Tensor  # [batch, seq] (aligned with student)
     teacher_completion_mask: Tensor  # [batch, seq] (aligned with teacher)
     labels: Tensor  # [batch, seq] target token ids
-    sampling_logprobs: Tensor  # [batch, seq] per-token logprobs from vLLM sampler
+    self_distillation_mask: Tensor  # [batch] whether this sample has a demonstration
 
 
 class SDFTDataset(IterableDataset):
-    """Dataset that yields dual-prompt pairs for SDFT training."""
+    """Dataset that yields prompt batches for SDFT training."""
 
     def __init__(
         self,
         dataset: Dataset,
         prompt_field: str = "prompt",
-        teacher_prompt_field: str = "teacher_prompt",
+        answer_field: str = "answer",
+        system_field: str | None = "system",
+        kind_field: str | None = "kind",
         shuffle: bool = True,
         seed: int = 0,
         batch_size: int = 4,
@@ -47,7 +51,9 @@ class SDFTDataset(IterableDataset):
         self.logger = get_logger()
         self.dataset = dataset
         self.prompt_field = prompt_field
-        self.teacher_prompt_field = teacher_prompt_field
+        self.answer_field = answer_field
+        self.system_field = system_field
+        self.kind_field = kind_field
         self.shuffle = shuffle
         self.seed = seed
         self.batch_size = batch_size
@@ -67,19 +73,20 @@ class SDFTDataset(IterableDataset):
                 self.epoch = epoch
                 dataset = self.dataset.shuffle(seed=self.epoch + self.seed) if self.shuffle else self.dataset
 
-            batch_student_prompts = []
-            batch_teacher_prompts = []
+            batch_prompts = []
+            batch_answers = []
+            batch_systems = []
+            batch_kinds = []
 
-            while len(batch_student_prompts) < self.batch_size:
+            while len(batch_prompts) < self.batch_size:
                 idx = self.step % self.num_examples
 
-                # Skip samples not for this rank
                 if self.step % self.data_world_size == self.data_rank:
                     example = dataset[idx]
-                    student_prompt = example[self.prompt_field]
-                    teacher_prompt = example[self.teacher_prompt_field]
-                    batch_student_prompts.append(student_prompt)
-                    batch_teacher_prompts.append(teacher_prompt)
+                    batch_prompts.append(example[self.prompt_field])
+                    batch_answers.append(example[self.answer_field])
+                    batch_systems.append(example.get(self.system_field) if self.system_field else None)
+                    batch_kinds.append(example.get(self.kind_field) if self.kind_field else None)
 
                 self.step += 1
                 epoch = self.step // self.num_examples
@@ -88,8 +95,10 @@ class SDFTDataset(IterableDataset):
                     dataset = self.dataset.shuffle(seed=self.epoch + self.seed) if self.shuffle else self.dataset
 
             yield SDFTPromptBatch(
-                student_prompts=batch_student_prompts,
-                teacher_prompts=batch_teacher_prompts,
+                prompts=batch_prompts,
+                answers=batch_answers,
+                systems=batch_systems,
+                kinds=batch_kinds,
             )
 
 
@@ -104,43 +113,50 @@ class FakeSDFTDataset(IterableDataset):
 
     def __iter__(self):
         while True:
-            student_prompts = [f"What is {i}+{i}?" for i in range(self.step, self.step + self.batch_size)]
-            teacher_prompts = [
-                f"What is {i}+{i}?\n\nExample answer: {2*i}\n\nNow answer:"
-                for i in range(self.step, self.step + self.batch_size)
-            ]
+            prompts = [f"What is {i}+{i}?" for i in range(self.step, self.step + self.batch_size)]
+            answers = [str(2 * i) for i in range(self.step, self.step + self.batch_size)]
             self.step += self.batch_size
             yield SDFTPromptBatch(
-                student_prompts=student_prompts,
-                teacher_prompts=teacher_prompts,
+                prompts=prompts,
+                answers=answers,
+                systems=[None] * self.batch_size,
+                kinds=[None] * self.batch_size,
             )
 
 
-def setup_sdft_dataset(config: SDFTDataConfig) -> SDFTDataset | FakeSDFTDataset:
+def setup_sdft_dataset(config: SDFTDataConfig, num_prompts_per_batch: int) -> SDFTDataset | FakeSDFTDataset:
     if config.type == "fake":
-        return FakeSDFTDataset(batch_size=config.batch_size)
+        return FakeSDFTDataset(batch_size=num_prompts_per_batch)
 
     logger = get_logger()
     logger.info(f"Loading SDFT dataset: {config.dataset_name} (split={config.dataset_split})")
-    if Path(config.dataset_name).is_dir():
+
+    path = Path(config.dataset_name)
+    if path.is_dir():
         dataset = cast(Dataset, load_from_disk(config.dataset_name))
+    elif path.exists() and path.suffix in (".json", ".jsonl"):
+        dataset = cast(Dataset, load_dataset("json", data_files=str(path), split="train"))
+    elif path.exists() and path.suffix == ".parquet":
+        dataset = cast(Dataset, load_dataset("parquet", data_files=str(path), split="train"))
     else:
         dataset = cast(Dataset, load_dataset(config.dataset_name, split=config.dataset_split))
 
     assert config.prompt_field in dataset.column_names, (
         f"Dataset must have a '{config.prompt_field}' column, found: {dataset.column_names}"
     )
-    assert config.teacher_prompt_field in dataset.column_names, (
-        f"Dataset must have a '{config.teacher_prompt_field}' column, found: {dataset.column_names}"
+    assert config.answer_field in dataset.column_names, (
+        f"Dataset must have a '{config.answer_field}' column, found: {dataset.column_names}"
     )
 
     return SDFTDataset(
         dataset=dataset,
         prompt_field=config.prompt_field,
-        teacher_prompt_field=config.teacher_prompt_field,
+        answer_field=config.answer_field,
+        system_field=config.system_field if config.system_field and config.system_field in dataset.column_names else None,
+        kind_field=config.kind_field if config.kind_field and config.kind_field in dataset.column_names else None,
         shuffle=config.shuffle,
         seed=config.seed,
-        batch_size=config.batch_size,
+        batch_size=num_prompts_per_batch,
     )
 
 
@@ -148,29 +164,24 @@ def prepare_sdft_batch(
     student_prompts: list[str],
     teacher_prompts: list[str],
     completions: list[str],
+    self_distillation_mask: list[bool],
     tokenizer: PreTrainedTokenizer,
     max_prompt_length: int,
     max_completion_length: int,
-    num_loss_tokens_to_skip: int = 0,
-    sampling_logprobs: list[list[float]] | None = None,
+    max_reprompt_length: int | None = None,
 ) -> SDFTTrainBatch:
     """Tokenize dual prompts + shared completions into padded training tensors.
 
     Both student and teacher get the same completion appended. The completion_mask
     identifies which tokens are from the completion (where we compute KL loss).
-
-    Returns:
-        SDFTTrainBatch with all tensors on CPU.
     """
     batch_size = len(student_prompts)
 
     all_student_ids = []
     all_teacher_ids = []
     all_completion_lengths = []
-    all_sampling_logprobs: list[list[float]] = []
 
     for i in range(batch_size):
-        # Apply chat template to prompts (matches how vLLM processes them during generation)
         student_prompt_text = tokenizer.apply_chat_template(
             [{"role": "user", "content": student_prompts[i]}],
             add_generation_prompt=True,
@@ -186,20 +197,17 @@ def prepare_sdft_batch(
         teacher_prompt_ids = tokenizer.encode(teacher_prompt_text, add_special_tokens=False)
         completion_ids = tokenizer.encode(completions[i], add_special_tokens=False)
 
-        # Truncate
         student_prompt_ids = student_prompt_ids[-max_prompt_length:]
-        teacher_prompt_ids = teacher_prompt_ids[-max_prompt_length:]
+        if max_reprompt_length is not None:
+            teacher_prompt_ids = teacher_prompt_ids[-max_reprompt_length:]
+        else:
+            teacher_prompt_ids = teacher_prompt_ids[-max_prompt_length:]
         completion_ids = completion_ids[:max_completion_length]
 
         all_student_ids.append(student_prompt_ids + completion_ids)
         all_teacher_ids.append(teacher_prompt_ids + completion_ids)
         all_completion_lengths.append(len(completion_ids))
 
-        if sampling_logprobs is not None:
-            # Truncate sampling logprobs to match completion_ids length
-            all_sampling_logprobs.append(sampling_logprobs[i][: len(completion_ids)])
-
-    # Pad to max length in batch (left-pad prompts, right-pad after completion)
     max_student_len = max(len(ids) for ids in all_student_ids)
     max_teacher_len = max(len(ids) for ids in all_teacher_ids)
 
@@ -214,6 +222,8 @@ def prepare_sdft_batch(
     teacher_position_ids = torch.zeros(batch_size, max_teacher_len, dtype=torch.long)
     teacher_completion_mask = torch.zeros(batch_size, max_teacher_len, dtype=torch.bool)
 
+    sd_mask = torch.tensor(self_distillation_mask, dtype=torch.float32)
+
     for i in range(batch_size):
         s_ids = all_student_ids[i]
         t_ids = all_teacher_ids[i]
@@ -224,12 +234,10 @@ def prepare_sdft_batch(
         student_input_ids[i, s_pad:] = torch.tensor(s_ids, dtype=torch.long)
         student_position_ids[i, s_pad:] = torch.arange(len(s_ids))
 
-        # Completion mask: last comp_len tokens
         if comp_len > 0:
-            start = max_student_len - comp_len + num_loss_tokens_to_skip
+            start = max_student_len - comp_len
             student_completion_mask[i, start:] = True
 
-        # Labels: shifted input_ids (next-token prediction on completion only)
         if comp_len > 1:
             label_start = max_student_len - comp_len
             student_labels[i, label_start : max_student_len - 1] = student_input_ids[i, label_start + 1 : max_student_len]
@@ -240,19 +248,8 @@ def prepare_sdft_batch(
         teacher_position_ids[i, t_pad:] = torch.arange(len(t_ids))
 
         if comp_len > 0:
-            t_start = max_teacher_len - comp_len + num_loss_tokens_to_skip
+            t_start = max_teacher_len - comp_len
             teacher_completion_mask[i, t_start:] = True
-
-    # Build sampling logprobs tensor aligned with student sequence
-    sampling_logprobs_tensor = torch.zeros(batch_size, max_student_len, dtype=torch.float32)
-    if all_sampling_logprobs:
-        for i in range(batch_size):
-            lps = all_sampling_logprobs[i]
-            comp_len = all_completion_lengths[i]
-            n = min(len(lps), comp_len)
-            if n > 0:
-                start = max_student_len - comp_len
-                sampling_logprobs_tensor[i, start : start + n] = torch.tensor(lps[:n], dtype=torch.float32)
 
     return SDFTTrainBatch(
         student_input_ids=student_input_ids,
@@ -262,5 +259,5 @@ def prepare_sdft_batch(
         completion_mask=student_completion_mask,
         teacher_completion_mask=teacher_completion_mask,
         labels=student_labels,
-        sampling_logprobs=sampling_logprobs_tensor,
+        self_distillation_mask=sd_mask,
     )

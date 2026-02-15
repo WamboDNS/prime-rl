@@ -1,11 +1,15 @@
 import asyncio
 import os
+import pickle
+import re
 import shutil
 import time
+from collections import defaultdict
 from datetime import timedelta
 
 import torch
 import torch.distributed as dist
+import torch.nn.functional as F
 from loguru import logger
 from openai import AsyncOpenAI
 from torchtitan.distributed.utils import clip_grad_norm_
@@ -16,12 +20,13 @@ from prime_rl.trainer.optim import setup_optimizer
 from prime_rl.trainer.parallel_dims import get_parallel_dims
 from prime_rl.trainer.runs import Progress
 from prime_rl.trainer.scheduler import setup_scheduler
-from prime_rl.trainer.sdft.config import SDFTTrainerConfig
+from prime_rl.trainer.sdft.config import SDFTRepromptConfig, SDFTTrainerConfig
 from prime_rl.trainer.sdft.data import (
     prepare_sdft_batch,
     setup_sdft_dataset,
 )
-from prime_rl.trainer.sdft.loss import entropy_mask, sdft_kl_loss
+from prime_rl.trainer.sdft.loss import add_tail, renorm_topk_log_probs, sdft_kl_loss
+from prime_rl.trainer.sdft.scoring import score_completion
 from prime_rl.trainer.utils import setup_torch_distributed
 from prime_rl.trainer.weights import gather_weights_on_master, save_state_dict
 from prime_rl.trainer.world import get_world
@@ -35,64 +40,123 @@ from prime_rl.utils.utils import clean_exit, get_broadcast_dir, get_step_path
 async def generate_completions(
     client: AsyncOpenAI,
     prompts: list[str],
+    system_messages: list[str | None],
     model_name: str,
     max_tokens: int,
     temperature: float,
     top_p: float,
     top_k: int,
-) -> tuple[list[str], list[list[float]]]:
-    """Generate completions from the inference server using the OpenAI API.
-
-    Returns:
-        Tuple of (completions, per_token_logprobs) where per_token_logprobs[i]
-        contains the logprob of each sampled token in completion i.
-    """
+    num_completions: int,
+) -> list[str]:
+    """Generate num_completions per prompt via the inference server."""
     tasks = []
-    for prompt in prompts:
-        task = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            extra_body={"top_k": top_k},
-            logprobs=True,
-        )
-        tasks.append(task)
+    for prompt, system in zip(prompts, system_messages):
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        for _ in range(num_completions):
+            task = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                extra_body={"top_k": top_k},
+            )
+            tasks.append(task)
     responses = await asyncio.gather(*tasks)
-    completions = [r.choices[0].message.content or "" for r in responses]
-    sampling_logprobs = [
-        [lp.logprob for lp in r.choices[0].logprobs.content] if r.choices[0].logprobs and r.choices[0].logprobs.content else []
-        for r in responses
-    ]
-    return completions, sampling_logprobs
+    return [r.choices[0].message.content or "" for r in responses]
+
+
+def _remove_thinking(text: str) -> str:
+    return re.sub(r"<think>.*?</think>\s*", "", text, flags=re.DOTALL)
+
+
+def build_teacher_prompts(
+    prompts: list[str],
+    completions: list[str],
+    scores: list[dict],
+    systems: list[str | None],
+    num_completions: int,
+    reprompt_cfg: SDFTRepromptConfig,
+) -> tuple[list[str], list[bool]]:
+    """Build teacher prompts with successful demonstrations (SDPO-style).
+
+    Groups completions by prompt, finds successful ones, and builds reprompt
+    messages. Returns teacher_prompts and self_distillation_mask.
+    """
+    num_prompts = len(prompts)
+    batch_size = num_prompts * num_completions
+
+    # Group successful completion indices by prompt
+    success_by_prompt: dict[int, list[int]] = defaultdict(list)
+    for i in range(batch_size):
+        if scores[i]["score"] >= reprompt_cfg.success_threshold:
+            success_by_prompt[i // num_completions].append(i)
+
+    teacher_prompts = []
+    sd_mask = []
+
+    for i in range(batch_size):
+        prompt_idx = i // num_completions
+        prompt = prompts[prompt_idx]
+
+        # Find a successful demonstration (not self if configured)
+        solution_idxs = list(success_by_prompt[prompt_idx])
+        if reprompt_cfg.dont_reprompt_on_self_success:
+            solution_idxs = [j for j in solution_idxs if j != i]
+
+        has_solution = len(solution_idxs) > 0
+        feedback = scores[i].get("feedback") if reprompt_cfg.include_feedback else None
+        has_feedback = feedback is not None
+
+        if has_solution or has_feedback:
+            solution_section = ""
+            if has_solution:
+                solution_text = completions[solution_idxs[0]]
+                if reprompt_cfg.remove_thinking:
+                    solution_text = _remove_thinking(solution_text)
+                solution_section = reprompt_cfg.solution_template.format(
+                    successful_previous_attempt=solution_text,
+                )
+
+            feedback_section = ""
+            if has_feedback:
+                feedback_section = reprompt_cfg.feedback_template.format(
+                    feedback_raw=feedback,
+                )
+
+            reprompt_text = reprompt_cfg.reprompt_template.format(
+                prompt=prompt,
+                solution=solution_section,
+                feedback=feedback_section,
+            )
+            teacher_prompts.append(reprompt_text)
+            sd_mask.append(True)
+        else:
+            teacher_prompts.append(prompt)
+            sd_mask.append(False)
+
+    return teacher_prompts, sd_mask
 
 
 def broadcast_weights_to_inference(model, output_dir, step, world):
-    """Save model weights to filesystem so the inference server can pick them up.
-
-    Cleans up the previous broadcast to avoid filling the disk.
-    """
+    """Save model weights to filesystem so the inference server can pick them up."""
     broadcast_dir = get_broadcast_dir(output_dir)
     state_dict = gather_weights_on_master(model, is_master=world.is_master)
     if world.is_master:
         step_path = get_step_path(broadcast_dir, step)
         save_state_dict(state_dict, step_path)
-        # Write a marker file so the inference server knows new weights are available
         (broadcast_dir / "latest_step.txt").write_text(str(step))
-        # Clean up previous broadcasts to avoid filling the disk
         for old_dir in broadcast_dir.iterdir():
             if old_dir.is_dir() and old_dir != step_path:
                 shutil.rmtree(old_dir)
     dist.barrier()
 
 
-def ema_sync(ref_model, student_model, alpha):
-    """Sync reference model with student: ref = alpha*student + (1-alpha)*ref.
-
-    Handles mixed replicated/sharded parameter layouts by preferring local
-    tensors and falling back to gathered student tensors only when needed.
-    """
+def ema_update(teacher_model, student_model, update_rate):
+    """EMA update: teacher = rate*student + (1-rate)*teacher."""
     def local_tensor_or_self(tensor):
         if hasattr(tensor, "to_local"):
             return tensor.to_local()
@@ -102,31 +166,86 @@ def ema_sync(ref_model, student_model, alpha):
 
     student_params = dict(student_model.named_parameters())
     with torch.no_grad():
-        for name, ref_param in ref_model.named_parameters():
-            if name not in student_params:
-                raise RuntimeError(f"EMA missing student parameter: {name}")
-
+        for name, teacher_param in teacher_model.named_parameters():
             student_param = student_params[name]
-            ref_local = local_tensor_or_self(ref_param.data)
+            teacher_local = local_tensor_or_self(teacher_param.data)
             student_local = local_tensor_or_self(student_param.data)
 
-            if student_local.shape == ref_local.shape:
+            if student_local.shape == teacher_local.shape:
                 student_tensor = student_local
             elif hasattr(student_param.data, "full_tensor"):
-                student_full = student_param.data.full_tensor()
-                if student_full.shape != ref_local.shape:
-                    raise RuntimeError(
-                        f"EMA shape mismatch for {name}: ref={tuple(ref_local.shape)} "
-                        f"student_local={tuple(student_local.shape)} student_full={tuple(student_full.shape)}"
-                    )
-                student_tensor = student_full
+                student_tensor = student_param.data.full_tensor()
             else:
                 raise RuntimeError(
-                    f"EMA shape mismatch for {name}: ref={tuple(ref_local.shape)} "
+                    f"EMA shape mismatch for {name}: teacher={tuple(teacher_local.shape)} "
                     f"student={tuple(student_local.shape)}"
                 )
 
-            ref_local.mul_(1 - alpha).add_(student_tensor, alpha=alpha)
+            teacher_local.mul_(1 - update_rate).add_(student_tensor, alpha=update_rate)
+
+
+def _extract_completion_logits(logits: torch.Tensor, completion_mask: torch.Tensor) -> torch.Tensor:
+    """Extract logits at completion positions into a dense tensor.
+
+    Args:
+        logits: [batch, seq, vocab]
+        completion_mask: [batch, seq] bool
+
+    Returns:
+        [batch, max_comp_len, vocab] with zero-padding.
+    """
+    batch_size = logits.shape[0]
+    max_comp_len = completion_mask.sum(dim=-1).max().item()
+    if max_comp_len == 0:
+        return logits[:, :1, :]
+
+    result = torch.zeros(batch_size, max_comp_len, logits.shape[-1], device=logits.device, dtype=logits.dtype)
+    for i in range(batch_size):
+        comp_indices = completion_mask[i].nonzero(as_tuple=True)[0]
+        n = comp_indices.shape[0]
+        result[i, :n] = logits[i, comp_indices]
+    return result
+
+
+def _compute_token_log_probs(logits: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+    """Compute per-token log probability of each generated token.
+
+    logits[t] predicts input_ids[t+1], so we shift and gather.
+
+    Args:
+        logits: [batch, seq, vocab]
+        input_ids: [batch, seq]
+
+    Returns:
+        [batch, seq] with log_prob[t] = log π(input_ids[t+1] | ...) for t < seq-1,
+        and 0.0 at the last position.
+    """
+    log_probs = logits[:, :-1, :].log_softmax(dim=-1)
+    token_lps = log_probs.gather(dim=-1, index=input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
+    return F.pad(token_lps, (1, 0), value=0.0)
+
+
+def _extract_completion_values(values: torch.Tensor, completion_mask: torch.Tensor) -> torch.Tensor:
+    """Extract per-token values at completion positions into a dense tensor.
+
+    Args:
+        values: [batch, seq]
+        completion_mask: [batch, seq] bool
+
+    Returns:
+        [batch, max_comp_len] with zero-padding.
+    """
+    batch_size = values.shape[0]
+    max_comp_len = completion_mask.sum(dim=-1).max().item()
+    if max_comp_len == 0:
+        return values[:, :1]
+
+    result = torch.zeros(batch_size, max_comp_len, device=values.device, dtype=values.dtype)
+    for i in range(batch_size):
+        comp_indices = completion_mask[i].nonzero(as_tuple=True)[0]
+        n = comp_indices.shape[0]
+        result[i, :n] = values[i, comp_indices]
+    return result
 
 
 @clean_exit
@@ -139,19 +258,16 @@ def train(config: SDFTTrainerConfig):
     )
     logger.info(f"Starting SDFT trainer in {world}")
 
-    # Setup monitor
     monitor = setup_monitor(config.wandb, output_dir=config.output_dir, run_config=config)
 
-    # Setup distributed
     setup_torch_distributed(timeout=timedelta(seconds=config.dist_timeout_seconds))
     torch.set_float32_matmul_precision("high")
 
-    # Initialize parallel dimensions
     parallel_dims = get_parallel_dims(config.model, config.generation.max_prompt_length + config.generation.max_completion_length)
 
-    grad_accum_steps = config.data.batch_size // config.data.micro_batch_size
+    mini_batch_size = config.data.mini_batch_size
+    grad_accum_steps = mini_batch_size // config.data.micro_batch_size
 
-    # Setup checkpoint managers
     ckpt_manager, weight_ckpt_manager = setup_ckpt_managers(config.output_dir, config.ckpt, config.model.lora)
 
     checkpoint_step = None
@@ -161,47 +277,49 @@ def train(config: SDFTTrainerConfig):
         else:
             checkpoint_step = config.ckpt.resume_step
 
-    # Initialize model
     logger.info(f"Initializing model ({config.model.name})")
     loading_from_ckpt_later = config.ckpt and checkpoint_step is not None
     model = setup_model(config.model, parallel_dims, loading_from_ckpt_later)
 
-    # Initialize tokenizer
     logger.info(f"Initializing tokenizer ({config.tokenizer})")
     tokenizer = setup_tokenizer(config.tokenizer)
 
-    # Optional: setup EMA reference model
-    ref_model = None
+    # EMA teacher model
+    teacher_model = None
     if config.ref_model.enabled:
-        logger.info("Initializing EMA reference model")
-        ref_model = setup_model(config.model, parallel_dims, loading_from_ckpt_later)
-        for param in ref_model.parameters():
+        logger.info("Initializing EMA teacher model")
+        teacher_model = setup_model(config.model, parallel_dims, loading_from_ckpt_later)
+        for param in teacher_model.parameters():
             param.requires_grad = False
 
-    # Setup optimizer
     logger.info(f"Initializing optimizer ({config.optim})")
     optimizer = setup_optimizer(config.optim, list(model.named_parameters()), parallel_dims)
 
-    # Setup scheduler
     scheduler_steps = config.max_steps
     logger.info(f"Setting up {config.scheduler.type} scheduler with {scheduler_steps} steps")
     scheduler = setup_scheduler(optimizer, config.scheduler, scheduler_steps, config.optim.lr)
 
-    # Setup dataset
+    num_prompts_per_batch = config.data.batch_size // config.generation.num_completions
     logger.info(f"Initializing dataset ({config.data})")
-    dataset = setup_sdft_dataset(config.data)
+    dataset = setup_sdft_dataset(config.data, num_prompts_per_batch)
     dataset_iter = iter(dataset)
 
-    # Resume from checkpoint if needed
     progress = Progress()
     if checkpoint_step is not None:
         ckpt_manager.load(checkpoint_step, model, [optimizer], scheduler, progress)
         logger.info(f"Resuming training from checkpoint step {checkpoint_step}")
 
-    # Setup inference client
     api_key = os.environ.get("VLLM_API_KEY", "dummy")
     base_url = config.client.base_url[0]
     client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=config.client.timeout)
+
+    # Loss config shortcuts
+    distillation_topk = config.loss.distillation_topk if config.loss.full_logit_distillation else None
+    is_clip = config.loss.is_clip
+    # IS correction is needed when the model changes between processing samples in the same generation batch:
+    # either multiple optimizer steps per batch (mini_batch_size < batch_size) or multiple iterations.
+    single_step_per_batch = (config.generation.num_iterations == 1 and mini_batch_size == config.data.batch_size)
+    needs_is = is_clip is not None and not single_step_per_batch
 
     logger.info(f"Starting training loop (max_steps={config.max_steps or 'infinite'})")
     max_memory = torch.cuda.mem_get_info()[1] / 1024**3
@@ -236,38 +354,70 @@ def train(config: SDFTTrainerConfig):
             torch.cuda.reset_peak_memory_stats()
             step_start_time = time.perf_counter()
 
-            # Get next batch of dual prompts
             prompt_batch = next(dataset_iter)
-            student_prompts = prompt_batch["student_prompts"]
-            teacher_prompts = prompt_batch["teacher_prompts"]
+            prompts = prompt_batch["prompts"]
+            answers = prompt_batch["answers"]
+            systems = prompt_batch["systems"]
+            kinds = prompt_batch["kinds"]
+            num_completions = config.generation.num_completions
 
-            # Choose which prompt to generate from
-            gen_prompts = teacher_prompts if config.generation.generate_from_teacher else student_prompts
-
-            # Generate completions from inference server (only rank 0, then broadcast)
             if world.is_master:
-                logger.info(f"Generating {len(gen_prompts)} completions...")
-                completions, sampling_logprobs = asyncio.get_event_loop().run_until_complete(
+                logger.info(f"Generating {len(prompts)}x{num_completions} completions...")
+                completions = asyncio.get_event_loop().run_until_complete(
                     generate_completions(
                         client=client,
-                        prompts=gen_prompts,
+                        prompts=prompts,
+                        system_messages=systems,
                         model_name=config.model.name,
                         max_tokens=config.generation.max_completion_length,
                         temperature=config.generation.temperature,
                         top_p=config.generation.top_p,
                         top_k=config.generation.top_k,
+                        num_completions=num_completions,
                     )
                 )
+
+                # Score completions
+                scores = []
+                for i, completion in enumerate(completions):
+                    prompt_idx = i // num_completions
+                    scores.append(score_completion(completion, answers[prompt_idx], kinds[prompt_idx]))
+
+                # Build teacher prompts with successful demonstrations
+                teacher_prompts, sd_mask = build_teacher_prompts(
+                    prompts=prompts,
+                    completions=completions,
+                    scores=scores,
+                    systems=systems,
+                    num_completions=num_completions,
+                    reprompt_cfg=config.reprompt,
+                )
+
+                # Expand student prompts to match (each prompt repeated num_completions times)
+                student_prompts = [p for p in prompts for _ in range(num_completions)]
+
+                num_success = sum(1 for s in scores if s["score"] >= config.reprompt.success_threshold)
+                num_reprompted = sum(sd_mask)
+                avg_score = sum(s["score"] for s in scores) / len(scores)
+                avg_comp_len = sum(len(c) for c in completions) / len(completions)
+                gen_metrics = {
+                    "gen/success_rate": num_success / len(scores),
+                    "gen/reprompt_fraction": num_reprompted / len(sd_mask),
+                    "gen/avg_score": avg_score,
+                    "gen/avg_completion_length": avg_comp_len,
+                }
+                gen_data = (completions, student_prompts, teacher_prompts, sd_mask, gen_metrics)
+                logger.info(
+                    f"Scored: {num_success}/{len(scores)} successful, "
+                    f"{num_reprompted}/{len(sd_mask)} reprompted"
+                )
             else:
-                completions = None
-                sampling_logprobs = None
+                gen_data = None
 
-            # Broadcast completions and sampling logprobs to all ranks
+            # Broadcast generation data to all ranks
             if world.world_size > 1:
-                import pickle
-
                 if world.is_master:
-                    data = pickle.dumps((completions, sampling_logprobs))
+                    data = pickle.dumps(gen_data)
                     size_tensor = torch.tensor([len(data)], dtype=torch.long, device="cuda")
                 else:
                     size_tensor = torch.tensor([0], dtype=torch.long, device="cuda")
@@ -280,55 +430,45 @@ def train(config: SDFTTrainerConfig):
                 dist.broadcast(data_tensor, src=0)
 
                 if not world.is_master:
-                    completions, sampling_logprobs = pickle.loads(data_tensor.cpu().numpy().tobytes())
+                    gen_data = pickle.loads(data_tensor.cpu().numpy().tobytes())
+
+            completions, student_prompts, teacher_prompts, sd_mask, gen_metrics = gen_data
 
             gen_time = time.perf_counter() - step_start_time
-            logger.debug(f"Generation took {gen_time:.2f}s, avg completion length: {sum(len(c) for c in completions) / len(completions):.0f} chars")
+            gen_metrics["gen/time"] = gen_time
+            monitor.log(gen_metrics, step=progress.step)
+            logger.debug(f"Generation took {gen_time:.2f}s, avg completion length: {gen_metrics['gen/avg_completion_length']:.0f} chars")
 
-            # Tokenize and prepare training batch
             train_batch = prepare_sdft_batch(
                 student_prompts=student_prompts,
                 teacher_prompts=teacher_prompts,
                 completions=completions,
+                self_distillation_mask=sd_mask,
                 tokenizer=tokenizer,
                 max_prompt_length=config.generation.max_prompt_length,
                 max_completion_length=config.generation.max_completion_length,
-                num_loss_tokens_to_skip=config.loss.num_loss_tokens_to_skip,
-                sampling_logprobs=sampling_logprobs if config.loss.importance_sampling else None,
+                max_reprompt_length=config.reprompt.max_reprompt_length,
             )
 
-            # Compute old_per_token_logps for importance sampling correction
-            if config.loss.importance_sampling:
-                with torch.no_grad():
-                    input_ids = train_batch["student_input_ids"].to("cuda")
-                    position_ids = train_batch["student_position_ids"].to("cuda")
-                    old_out = forward(model, input_ids, position_ids)
-                    old_logprobs = old_out["logits"].log_softmax(dim=-1)
-                    # Gather logprobs at the actual token positions (shifted by 1 for next-token prediction)
-                    # For token at position t, the logprob comes from the model output at position t-1
-                    shifted_ids = input_ids[:, 1:]  # [batch, seq-1]
-                    shifted_logprobs = old_logprobs[:, :-1, :]  # [batch, seq-1, vocab]
-                    old_per_token_logps = shifted_logprobs.gather(
-                        dim=-1, index=shifted_ids.unsqueeze(-1)
-                    ).squeeze(-1)  # [batch, seq-1]
-                    # Pad back to full sequence length (position 0 has no predecessor)
-                    old_per_token_logps = torch.cat(
-                        [torch.zeros(old_per_token_logps.shape[0], 1, device="cuda"), old_per_token_logps],
-                        dim=1,
-                    )
-                    train_batch["old_per_token_logps"] = old_per_token_logps.cpu()
-                    del old_out, old_logprobs, shifted_logprobs
-
-            # Split into micro-batches for gradient accumulation
+            # Split into mini-batches, then micro-batches within each
             buffer = []
             bs = config.data.micro_batch_size
             for mb_idx in range(0, config.data.batch_size, bs):
-                mb = {
-                    k: v[mb_idx : mb_idx + bs] for k, v in train_batch.items()
-                }
+                mb = {k: v[mb_idx : mb_idx + bs] for k, v in train_batch.items()}
                 buffer.append(mb)
 
-            # Repeat buffer for num_iterations
+            # Compute old logprobs for IS correction before any optimizer steps
+            if needs_is:
+                logger.debug("Computing old logprobs for IS correction")
+                with torch.no_grad():
+                    for mb in buffer:
+                        ids = mb["student_input_ids"].to("cuda")
+                        pos = mb["student_position_ids"].to("cuda")
+                        out = forward(model, ids, pos)
+                        token_lps = _compute_token_log_probs(out["logits"], ids)
+                        mb["old_token_log_probs"] = token_lps.cpu()
+
+            # Repeat buffer for multi-iteration (off-policy) training
             if config.generation.num_iterations > 1:
                 buffer = buffer * config.generation.num_iterations
 
@@ -336,7 +476,6 @@ def train(config: SDFTTrainerConfig):
 
             logger.debug(f"Batch shapes: student={train_batch['student_input_ids'].shape}, teacher={train_batch['teacher_input_ids'].shape}, completion_tokens={train_batch['completion_mask'].sum().item()}")
 
-            # Broadcast weights to inference server after generation
             broadcast_weights_to_inference(model, config.output_dir, progress.step, world)
 
         # === Training phase ===
@@ -352,7 +491,6 @@ def train(config: SDFTTrainerConfig):
             micro_batch = buffer[buffer_idx]
             buffer_idx += 1
 
-            # Move to device
             student_input_ids = micro_batch["student_input_ids"].to("cuda")
             student_position_ids = micro_batch["student_position_ids"].to("cuda")
             teacher_input_ids = micro_batch["teacher_input_ids"].to("cuda")
@@ -364,61 +502,75 @@ def train(config: SDFTTrainerConfig):
             student_out = forward(model, student_input_ids, student_position_ids)
             student_logits = student_out["logits"]
 
-            # Teacher forward pass (no gradients)
-            teacher_model = ref_model if ref_model is not None else model
+            # Teacher forward pass (no gradients, using EMA model if available)
+            active_teacher = teacher_model if teacher_model is not None else model
             with torch.no_grad():
-                teacher_out = forward(teacher_model, teacher_input_ids, teacher_position_ids)
+                teacher_out = forward(active_teacher, teacher_input_ids, teacher_position_ids)
                 teacher_logits = teacher_out["logits"]
 
-            logger.debug(f"Micro-step {micro_step}: student_logits={student_logits.shape}, teacher_logits={teacher_logits.shape}")
-
-            # Align logits to completion tokens
-            # Student logits shape: [batch, student_seq, vocab]
-            # Teacher logits shape: [batch, teacher_seq, vocab]
-            # We need to extract only completion logits from both (they have same completion length)
+            # Extract completion-aligned logits
             student_comp_logits = _extract_completion_logits(student_logits, completion_mask)
             teacher_comp_logits = _extract_completion_logits(teacher_logits, teacher_completion_mask)
 
-            # Build aligned completion mask (all True since we extracted exactly completion tokens)
             comp_len = student_comp_logits.shape[1]
             aligned_mask = torch.ones(student_comp_logits.shape[0], comp_len, dtype=torch.bool, device="cuda")
 
-            # Optional entropy masking
-            if config.loss.top_entropy_quantile < 1.0:
-                aligned_mask = entropy_mask(
-                    teacher_comp_logits, aligned_mask, config.loss.top_entropy_quantile
-                )
+            # Zero out loss for samples without successful demonstrations
+            sd_mask = micro_batch["self_distillation_mask"].to("cuda")
+            aligned_mask = aligned_mask * sd_mask.unsqueeze(1).bool()
 
-            # Compute per-token importance sampling weights
-            importance_weights = None
-            if config.loss.importance_sampling:
-                sampling_lps = _extract_completion_values(
-                    micro_batch["sampling_logprobs"].to("cuda"), completion_mask
-                )
-                old_lps = _extract_completion_values(
-                    micro_batch["old_per_token_logps"].to("cuda"), completion_mask
-                )
-                importance_weights = torch.exp(old_lps - sampling_lps).clamp(max=config.loss.importance_sampling_cap)
-                batch_is_mean += (importance_weights * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
-                batch_is_max = torch.max(batch_is_max, importance_weights.max().detach())
+            # Compute log_softmax for KL
+            student_comp_log_probs = student_comp_logits.log_softmax(dim=-1)
+            with torch.no_grad():
+                teacher_comp_log_probs = teacher_comp_logits.log_softmax(dim=-1)
+
+            # Top-K distillation
+            if distillation_topk is not None:
+                student_topk_lp, topk_idx = student_comp_log_probs.topk(distillation_topk, dim=-1)
+                with torch.no_grad():
+                    teacher_topk_lp = teacher_comp_log_probs.gather(-1, topk_idx)
+
+                if config.loss.distillation_add_tail:
+                    student_distill_lp = add_tail(student_topk_lp)
+                    teacher_distill_lp = add_tail(teacher_topk_lp)
+                else:
+                    student_distill_lp = renorm_topk_log_probs(student_topk_lp)
+                    teacher_distill_lp = renorm_topk_log_probs(teacher_topk_lp)
+            else:
+                student_distill_lp = student_comp_log_probs
+                teacher_distill_lp = teacher_comp_log_probs
+
+            # IS correction (SDPO-style: ratio = π_current / π_old)
+            is_ratio = None
+            if needs_is:
+                student_token_lp = _compute_token_log_probs(student_logits, student_input_ids)
+                student_token_lp_comp = _extract_completion_values(student_token_lp, completion_mask)
+                old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
+                old_token_lp_comp = _extract_completion_values(old_token_lp_comp, completion_mask)
+
+                negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
+                negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
+                is_ratio = torch.exp(negative_approx_kl).clamp(max=is_clip)
+
+                batch_is_mean += (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
+                batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
 
             # Compute KL loss
             loss, metrics = sdft_kl_loss(
-                student_comp_logits,
-                teacher_comp_logits,
+                student_distill_lp,
+                teacher_distill_lp,
                 aligned_mask,
                 alpha=config.loss.alpha,
-                temperature=config.loss.temperature,
-                importance_weights=importance_weights,
+                is_ratio=is_ratio,
             )
 
             batch_loss += loss.detach() / grad_accum_steps
             batch_kl += metrics["kl_divergence"] / grad_accum_steps
 
-            # Delete logits before backward to save memory
+            # Free memory before backward
             del student_logits, teacher_logits, student_comp_logits, teacher_comp_logits
+            del student_comp_log_probs, teacher_comp_log_probs, student_distill_lp, teacher_distill_lp
 
-            # Backward
             (loss / grad_accum_steps).backward()
 
         # Optimizer step
@@ -431,16 +583,15 @@ def train(config: SDFTTrainerConfig):
         current_lr = optimizer.param_groups[0]["lr"]
         scheduler.step()
 
-        # Optional EMA sync
-        if ref_model is not None and (progress.step + 1) % config.ref_model.sync_steps == 0:
-            ema_sync(ref_model, model, config.ref_model.mixup_alpha)
-            logger.debug(f"EMA sync at step {progress.step + 1} (alpha={config.ref_model.mixup_alpha})")
+        # EMA update after every optimizer step
+        if teacher_model is not None:
+            ema_update(teacher_model, model, config.ref_model.update_rate)
+            logger.debug(f"EMA update at step {progress.step + 1} (rate={config.ref_model.update_rate})")
 
         # Synchronize metrics
         dist.all_reduce(batch_loss, op=dist.ReduceOp.AVG)
         dist.all_reduce(batch_kl, op=dist.ReduceOp.AVG)
 
-        # Log metrics
         step_time = time.perf_counter() - train_step_start
         peak_memory = torch.cuda.max_memory_reserved() / 1024**3
 
@@ -464,7 +615,7 @@ def train(config: SDFTTrainerConfig):
             "time/step": step_time,
             "step": progress.step,
         }
-        if config.loss.importance_sampling:
+        if needs_is:
             log_dict["is/weight_mean"] = batch_is_mean.item()
             log_dict["is/weight_max"] = batch_is_max.item()
         monitor.log(log_dict, step=progress.step)
@@ -481,52 +632,6 @@ def train(config: SDFTTrainerConfig):
         weight_ckpt_manager.maybe_clean()
 
     logger.success("SDFT trainer finished!")
-
-
-def _extract_completion_logits(logits: torch.Tensor, completion_mask: torch.Tensor) -> torch.Tensor:
-    """Extract logits corresponding to completion tokens and stack into a dense tensor.
-
-    Args:
-        logits: [batch, seq, vocab]
-        completion_mask: [batch, seq] bool
-
-    Returns:
-        [batch, max_comp_len, vocab] with zero-padding where needed.
-    """
-    batch_size = logits.shape[0]
-    max_comp_len = completion_mask.sum(dim=-1).max().item()
-    if max_comp_len == 0:
-        return logits[:, :1, :]  # Fallback: return at least one token
-
-    result = torch.zeros(batch_size, max_comp_len, logits.shape[-1], device=logits.device, dtype=logits.dtype)
-    for i in range(batch_size):
-        comp_indices = completion_mask[i].nonzero(as_tuple=True)[0]
-        n = comp_indices.shape[0]
-        result[i, :n] = logits[i, comp_indices]
-    return result
-
-
-def _extract_completion_values(values: torch.Tensor, completion_mask: torch.Tensor) -> torch.Tensor:
-    """Extract per-token values at completion positions into a dense tensor.
-
-    Args:
-        values: [batch, seq]
-        completion_mask: [batch, seq] bool
-
-    Returns:
-        [batch, max_comp_len] with zero-padding where needed.
-    """
-    batch_size = values.shape[0]
-    max_comp_len = completion_mask.sum(dim=-1).max().item()
-    if max_comp_len == 0:
-        return values[:, :1]
-
-    result = torch.zeros(batch_size, max_comp_len, device=values.device, dtype=values.dtype)
-    for i in range(batch_size):
-        comp_indices = completion_mask[i].nonzero(as_tuple=True)[0]
-        n = comp_indices.shape[0]
-        result[i, :n] = values[i, comp_indices]
-    return result
 
 
 def main():

@@ -1,5 +1,9 @@
-# SDFT Example Configuration
+# SDFT Example Configuration (minimal, for testing)
 # Usage: uv run sdft @ configs/sdft/example.toml
+# See generalization.toml and rich_feedback.toml for paper experiments.
+
+inference_gpu_ids = [0]
+trainer_gpu_ids = [1]
 
 [trainer.model]
 name = "Qwen/Qwen3-0.6B"
@@ -8,27 +12,27 @@ fused_lm_head_chunk_size = "disabled"
 [trainer.data]
 dataset_name = "my-org/my-sdft-dataset"
 prompt_field = "prompt"
-teacher_prompt_field = "teacher_prompt"
-batch_size = 4
+answer_field = "answer"
+batch_size = 8
 micro_batch_size = 1
 
 [trainer.loss]
-alpha = 0.0            # Forward KL
-temperature = 1.0
-top_entropy_quantile = 1.0
+alpha = 0.5
+distillation_topk = 100
+is_clip = 2.0
 
 [trainer.ref_model]
 enabled = false
 
 [trainer.generation]
+num_completions = 4
 max_completion_length = 1024
 max_prompt_length = 1024
 temperature = 1.0
-num_iterations = 1
 
 [trainer.optim]
 type = "adamw"
-lr = 2e-5
+lr = 1e-5
 weight_decay = 0.01
 
 [trainer.scheduler]
@@ -37,9 +41,6 @@ type = "constant"
 [trainer]
 max_steps = 100
 output_dir = "outputs/sdft"
-
-inference_gpu_ids = [0]
-trainer_gpu_ids = [1]
 
 [inference.model]
 max_model_len = 4096

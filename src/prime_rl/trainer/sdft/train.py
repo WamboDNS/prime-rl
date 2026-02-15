@@ -30,6 +30,7 @@ from prime_rl.trainer.sdft.scoring import score_completion
 from prime_rl.trainer.utils import setup_torch_distributed
 from prime_rl.trainer.weights import gather_weights_on_master, save_state_dict
 from prime_rl.trainer.world import get_world
+from prime_rl.utils.act_offloading import maybe_activation_offloading
 from prime_rl.utils.logger import setup_logger
 from prime_rl.utils.monitor import setup_monitor
 from prime_rl.utils.pathing import resolve_latest_ckpt_step
@@ -499,7 +500,8 @@ def train(config: SDFTTrainerConfig):
             teacher_completion_mask = micro_batch["teacher_completion_mask"].to("cuda")
 
             # Student forward pass (with gradients)
-            student_out = forward(model, student_input_ids, student_position_ids)
+            with maybe_activation_offloading(config.model.ac_offloading):
+                student_out = forward(model, student_input_ids, student_position_ids)
             student_logits = student_out["logits"]
 
             # Teacher forward pass (no gradients, using EMA model if available)

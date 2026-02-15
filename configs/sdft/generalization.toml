@@ -16,6 +16,9 @@ trainer_gpu_ids = [1, 2, 3]
 name = "Qwen/Qwen3-8B"
 fused_lm_head_chunk_size = "disabled"
 
+[trainer.model.ac]
+freq = 1
+
 [trainer.data]
 dataset_name = "datasets/sciknoweval/biology"
 prompt_field = "prompt"

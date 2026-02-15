@@ -10,10 +10,9 @@
 #
 # Steps:
 #   1. Start inference server → baseline eval on test.json
-#   2. Stop inference server
-#   3. Run SDFT training
-#   4. Start inference with trained checkpoint → eval on test.json
-#   5. Print comparison table
+#   2. Run SDFT training (inference server stays running for generation)
+#   3. Stop inference server → restart with trained checkpoint → eval
+#   4. Print comparison table
 
 set -euo pipefail
 
@@ -109,16 +108,16 @@ uv run python scripts/sdft/evaluate.py \
     --label baseline \
     --output "$RESULTS_DIR/baseline.json"
 
+# === 2. Training (inference server stays running for generation) ===
 echo ""
-echo "=== 3. Stopping inference server ==="
-stop_inference
-
-# === 2. Training ===
-echo ""
-echo "=== 4. Starting SDFT training ==="
+echo "=== 3. Starting SDFT training ==="
 uv run sdft @ "$CONFIG" \
     --trainer.data.dataset_name="$TRAIN_DATA" \
     "${EXTRA_ARGS[@]}"
+
+echo ""
+echo "=== 4. Stopping inference server ==="
+stop_inference
 
 # Find latest checkpoint
 LATEST_STEP=$(cat "$OUTPUT_DIR/weights/latest_step.txt" 2>/dev/null || ls -1 "$OUTPUT_DIR/weights/" | sort -n | tail -1)
@@ -130,7 +129,6 @@ if [ ! -d "$CHECKPOINT" ]; then
 fi
 echo "Using checkpoint: $CHECKPOINT"
 
-# === 3. Trained model evaluation ===
 echo ""
 echo "=== 5. Starting inference server (trained) ==="
 start_inference "$CHECKPOINT"

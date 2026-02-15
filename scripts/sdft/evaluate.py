@@ -78,14 +78,14 @@ def main():
     args = parser.parse_args()
 
     test_path = Path(args.test_data)
-    if test_path.suffix == ".jsonl":
-        with open(test_path) as f:
-            data = [json.loads(line) for line in f if line.strip()]
-    else:
-        with open(test_path) as f:
-            data = json.load(f)
+    with open(test_path) as f:
+        text = f.read()
+    try:
+        data = json.loads(text)
         if isinstance(data, dict):
             data = [data]
+    except json.JSONDecodeError:
+        data = [json.loads(line) for line in text.splitlines() if line.strip()]
 
     client = AsyncOpenAI(base_url=args.base_url, api_key="unused", timeout=120)
     semaphore = asyncio.Semaphore(args.concurrency)

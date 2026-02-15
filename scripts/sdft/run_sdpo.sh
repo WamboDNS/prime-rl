@@ -9,10 +9,12 @@
 #   ./scripts/sdft/run_sdpo.sh configs/sdft/generalization.toml ../SDPO/datasets/sciknoweval/biology --trainer.model.name=allenai/Olmo-3-7B-Instruct
 #
 # Steps:
-#   1. Start inference server → baseline eval on test.json
+#   1. Start inference server
 #   2. Run SDFT training (inference server stays running for generation)
 #   3. Stop inference server → restart with trained checkpoint → eval
 #   4. Print comparison table
+#
+# Set SKIP_BASELINE=1 to skip baseline evaluation (e.g. if already done).
 
 set -euo pipefail
 
@@ -92,23 +94,23 @@ stop_inference() {
     wait $INFERENCE_PID 2>/dev/null || true
 }
 
-# === 1. Baseline evaluation ===
 echo ""
-echo "=== 1. Starting inference server (baseline) ==="
+echo "=== 1. Starting inference server ==="
 start_inference "$MODEL"
 
-echo ""
-echo "=== 2. Baseline evaluation ==="
-uv run python scripts/sdft/evaluate.py \
-    --test-data "$TEST_DATA" \
-    --base-url "$BASE_URL" \
-    --model "$MODEL" \
-    --num-completions 1 \
-    --temperature 0.0 \
-    --label baseline \
-    --output "$RESULTS_DIR/baseline.json"
+if [ "${SKIP_BASELINE:-0}" != "1" ]; then
+    echo ""
+    echo "=== 2. Baseline evaluation ==="
+    uv run python scripts/sdft/evaluate.py \
+        --test-data "$TEST_DATA" \
+        --base-url "$BASE_URL" \
+        --model "$MODEL" \
+        --num-completions 1 \
+        --temperature 0.0 \
+        --label baseline \
+        --output "$RESULTS_DIR/baseline.json"
+fi
 
-# === 2. Training (inference server stays running for generation) ===
 echo ""
 echo "=== 3. Starting SDFT training ==="
 uv run sdft @ "$CONFIG" \

@@ -25,6 +25,7 @@ from prime_rl.trainer.sdft.data import (
     prepare_sdft_batch,
     setup_sdft_dataset,
 )
+from prime_rl.trainer.sdft.fused_distill import fused_distill_topk
 from prime_rl.trainer.sdft.loss import add_tail, renorm_topk_log_probs, sdft_kl_loss
 from prime_rl.trainer.sdft.scoring import score_completion
 from prime_rl.trainer.utils import setup_torch_distributed
@@ -224,6 +225,12 @@ def _compute_token_log_probs(logits: torch.Tensor, input_ids: torch.Tensor) -> t
     log_probs = logits[:, :-1, :].log_softmax(dim=-1)
     token_lps = log_probs.gather(dim=-1, index=input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
     return F.pad(token_lps, (1, 0), value=0.0)
+
+
+def forward_hidden(model: torch.nn.Module, input_ids: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
+    """Get hidden states from the model backbone without going through lm_head."""
+    outputs = model.model(input_ids=input_ids, position_ids=position_ids)
+    return outputs.last_hidden_state
 
 
 def _extract_completion_values(values: torch.Tensor, completion_mask: torch.Tensor) -> torch.Tensor:
@@ -499,38 +506,35 @@ def train(config: SDFTTrainerConfig):
             completion_mask = micro_batch["completion_mask"].to("cuda")
             teacher_completion_mask = micro_batch["teacher_completion_mask"].to("cuda")
 
-            # Student forward pass (with gradients)
-            with maybe_activation_offloading(config.model.ac_offloading):
-                student_out = forward(model, student_input_ids, student_position_ids)
-            student_logits = student_out["logits"]
-
-            # Teacher forward pass (no gradients, using EMA model if available)
             active_teacher = teacher_model if teacher_model is not None else model
-            with torch.no_grad():
-                teacher_out = forward(active_teacher, teacher_input_ids, teacher_position_ids)
-                teacher_logits = teacher_out["logits"]
-
-            # Extract completion-aligned logits
-            student_comp_logits = _extract_completion_logits(student_logits, completion_mask)
-            teacher_comp_logits = _extract_completion_logits(teacher_logits, teacher_completion_mask)
-
-            comp_len = student_comp_logits.shape[1]
-            aligned_mask = torch.ones(student_comp_logits.shape[0], comp_len, dtype=torch.bool, device="cuda")
-
-            # Zero out loss for samples without successful demonstrations
             sd_mask = micro_batch["self_distillation_mask"].to("cuda")
-            aligned_mask = aligned_mask * sd_mask.unsqueeze(1).bool()
 
-            # Compute log_softmax for KL
-            student_comp_log_probs = student_comp_logits.log_softmax(dim=-1)
-            with torch.no_grad():
-                teacher_comp_log_probs = teacher_comp_logits.log_softmax(dim=-1)
-
-            # Top-K distillation
-            if distillation_topk is not None:
-                student_topk_lp, topk_idx = student_comp_log_probs.topk(distillation_topk, dim=-1)
+            if config.loss.fused_distillation:
+                # Fused path: operate on hidden states, never materialize [N, V]
+                with maybe_activation_offloading(config.model.ac_offloading):
+                    student_hidden = forward_hidden(model, student_input_ids, student_position_ids)
                 with torch.no_grad():
-                    teacher_topk_lp = teacher_comp_log_probs.gather(-1, topk_idx)
+                    teacher_hidden = forward_hidden(active_teacher, teacher_input_ids, teacher_position_ids)
+
+                student_comp_hidden = _extract_completion_logits(student_hidden, completion_mask)
+                teacher_comp_hidden = _extract_completion_logits(teacher_hidden, teacher_completion_mask)
+
+                B = student_comp_hidden.shape[0]
+                comp_len = student_comp_hidden.shape[1]
+                H = student_comp_hidden.shape[2]
+
+                s_flat = student_comp_hidden.reshape(-1, H)
+                t_flat = teacher_comp_hidden.reshape(-1, H)
+                lm_weight = model.lm_head.weight
+
+                student_topk_lp, teacher_topk_lp, _ = fused_distill_topk(
+                    s_flat, t_flat, lm_weight,
+                    K=distillation_topk,
+                    chunk_size=config.loss.distillation_chunk_size,
+                )
+
+                student_topk_lp = student_topk_lp.reshape(B, comp_len, distillation_topk)
+                teacher_topk_lp = teacher_topk_lp.reshape(B, comp_len, distillation_topk)
 
                 if config.loss.distillation_add_tail:
                     student_distill_lp = add_tail(student_topk_lp)
@@ -538,42 +542,110 @@ def train(config: SDFTTrainerConfig):
                 else:
                     student_distill_lp = renorm_topk_log_probs(student_topk_lp)
                     teacher_distill_lp = renorm_topk_log_probs(teacher_topk_lp)
+
+                aligned_mask = torch.ones(B, comp_len, dtype=torch.bool, device="cuda")
+                aligned_mask = aligned_mask * sd_mask.unsqueeze(1).bool()
+
+                # IS correction still needs full forward for token-level log probs
+                is_ratio = None
+                if needs_is:
+                    with torch.no_grad():
+                        student_out = forward(model, student_input_ids, student_position_ids)
+                        student_logits = student_out["logits"]
+                    student_token_lp = _compute_token_log_probs(student_logits, student_input_ids)
+                    student_token_lp_comp = _extract_completion_values(student_token_lp, completion_mask)
+                    old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
+                    old_token_lp_comp = _extract_completion_values(old_token_lp_comp, completion_mask)
+
+                    negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
+                    negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
+                    is_ratio = torch.exp(negative_approx_kl).clamp(max=is_clip)
+
+                    batch_is_mean += (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
+                    batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
+                    del student_logits
+
+                loss, metrics = sdft_kl_loss(
+                    student_distill_lp,
+                    teacher_distill_lp,
+                    aligned_mask,
+                    alpha=config.loss.alpha,
+                    is_ratio=is_ratio,
+                )
+
+                batch_loss += loss.detach() / grad_accum_steps
+                batch_kl += metrics["kl_divergence"] / grad_accum_steps
+
+                del student_hidden, teacher_hidden, student_comp_hidden, teacher_comp_hidden
+                del student_distill_lp, teacher_distill_lp
+
+                (loss / grad_accum_steps).backward()
+
             else:
-                student_distill_lp = student_comp_log_probs
-                teacher_distill_lp = teacher_comp_log_probs
+                # Standard path: full [N, V] logit tensors
+                with maybe_activation_offloading(config.model.ac_offloading):
+                    student_out = forward(model, student_input_ids, student_position_ids)
+                student_logits = student_out["logits"]
 
-            # IS correction (SDPO-style: ratio = π_current / π_old)
-            is_ratio = None
-            if needs_is:
-                student_token_lp = _compute_token_log_probs(student_logits, student_input_ids)
-                student_token_lp_comp = _extract_completion_values(student_token_lp, completion_mask)
-                old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
-                old_token_lp_comp = _extract_completion_values(old_token_lp_comp, completion_mask)
+                with torch.no_grad():
+                    teacher_out = forward(active_teacher, teacher_input_ids, teacher_position_ids)
+                    teacher_logits = teacher_out["logits"]
 
-                negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
-                negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
-                is_ratio = torch.exp(negative_approx_kl).clamp(max=is_clip)
+                student_comp_logits = _extract_completion_logits(student_logits, completion_mask)
+                teacher_comp_logits = _extract_completion_logits(teacher_logits, teacher_completion_mask)
 
-                batch_is_mean += (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
-                batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
+                comp_len = student_comp_logits.shape[1]
+                aligned_mask = torch.ones(student_comp_logits.shape[0], comp_len, dtype=torch.bool, device="cuda")
+                aligned_mask = aligned_mask * sd_mask.unsqueeze(1).bool()
 
-            # Compute KL loss
-            loss, metrics = sdft_kl_loss(
-                student_distill_lp,
-                teacher_distill_lp,
-                aligned_mask,
-                alpha=config.loss.alpha,
-                is_ratio=is_ratio,
-            )
+                student_comp_log_probs = student_comp_logits.log_softmax(dim=-1)
+                with torch.no_grad():
+                    teacher_comp_log_probs = teacher_comp_logits.log_softmax(dim=-1)
 
-            batch_loss += loss.detach() / grad_accum_steps
-            batch_kl += metrics["kl_divergence"] / grad_accum_steps
+                if distillation_topk is not None:
+                    student_topk_lp, topk_idx = student_comp_log_probs.topk(distillation_topk, dim=-1)
+                    with torch.no_grad():
+                        teacher_topk_lp = teacher_comp_log_probs.gather(-1, topk_idx)
 
-            # Free memory before backward
-            del student_logits, teacher_logits, student_comp_logits, teacher_comp_logits
-            del student_comp_log_probs, teacher_comp_log_probs, student_distill_lp, teacher_distill_lp
+                    if config.loss.distillation_add_tail:
+                        student_distill_lp = add_tail(student_topk_lp)
+                        teacher_distill_lp = add_tail(teacher_topk_lp)
+                    else:
+                        student_distill_lp = renorm_topk_log_probs(student_topk_lp)
+                        teacher_distill_lp = renorm_topk_log_probs(teacher_topk_lp)
+                else:
+                    student_distill_lp = student_comp_log_probs
+                    teacher_distill_lp = teacher_comp_log_probs
 
-            (loss / grad_accum_steps).backward()
+                is_ratio = None
+                if needs_is:
+                    student_token_lp = _compute_token_log_probs(student_logits, student_input_ids)
+                    student_token_lp_comp = _extract_completion_values(student_token_lp, completion_mask)
+                    old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
+                    old_token_lp_comp = _extract_completion_values(old_token_lp_comp, completion_mask)
+
+                    negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
+                    negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
+                    is_ratio = torch.exp(negative_approx_kl).clamp(max=is_clip)
+
+                    batch_is_mean += (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
+                    batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
+
+                loss, metrics = sdft_kl_loss(
+                    student_distill_lp,
+                    teacher_distill_lp,
+                    aligned_mask,
+                    alpha=config.loss.alpha,
+                    is_ratio=is_ratio,
+                )
+
+                batch_loss += loss.detach() / grad_accum_steps
+                batch_kl += metrics["kl_divergence"] / grad_accum_steps
+
+                del student_logits, teacher_logits, student_comp_logits, teacher_comp_logits
+                del student_comp_log_probs, teacher_comp_log_probs, student_distill_lp, teacher_distill_lp
+
+                (loss / grad_accum_steps).backward()
 
         # Optimizer step
         grad_norm = clip_grad_norm_(model.parameters(), max_norm=config.optim.max_norm, ep_enabled=False)

@@ -39,6 +39,16 @@ class SDFTLossConfig(BaseConfig):
         Field(description="Add tail probability bucket when using top-K distillation."),
     ] = True
 
+    fused_distillation: Annotated[
+        bool,
+        Field(description="Use chunked fused distillation to avoid materializing [N, V] logit tensors."),
+    ] = False
+
+    distillation_chunk_size: Annotated[
+        int,
+        Field(ge=1, description="Vocab chunk size for fused distillation."),
+    ] = 2048
+
     is_clip: Annotated[
         float | None,
         Field(gt=0.0, description="Clip value for IS ratio (π_current/π_old). None disables IS."),
@@ -246,6 +256,12 @@ class SDFTTrainerConfig(BaseSettings):
                 "Chunked loss is not supported for SDFT training, please set `model.fused_lm_head_chunk_size` to 'disabled'"
             )
         self.model.fused_lm_head_chunk_size = "disabled"
+        return self
+
+    @model_validator(mode="after")
+    def validate_fused_distillation(self):
+        if self.loss.fused_distillation and self.loss.distillation_topk is None:
+            raise ValueError("fused_distillation requires distillation_topk to be set (not None)")
         return self
 
     @model_validator(mode="after")

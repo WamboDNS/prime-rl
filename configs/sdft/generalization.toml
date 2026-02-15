@@ -33,6 +33,8 @@ alpha = 0.5
 full_logit_distillation = true
 distillation_topk = 100
 distillation_add_tail = true
+fused_distillation = true
+distillation_chunk_size = 2048
 is_clip = 2.0
 
 [trainer.ref_model]

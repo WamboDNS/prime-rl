@@ -9,12 +9,13 @@
 #   ./scripts/sdft/run_sdpo.sh configs/sdft/generalization.toml ../SDPO/datasets/sciknoweval/biology --trainer.model.name=allenai/Olmo-3-7B-Instruct
 #
 # Steps:
-#   1. Start inference server
-#   2. Run SDFT training (inference server stays running for generation)
-#   3. Stop inference server → restart with trained checkpoint → eval
+#   1. Baseline eval (start inference server, eval, stop)
+#   2. SDFT training (uv run sdft manages its own inference server)
+#   3. Trained eval (start inference server with checkpoint, eval, stop)
 #   4. Print comparison table
 #
 # Set SKIP_BASELINE=1 to skip baseline evaluation (e.g. if already done).
+# Set SKIP_EVAL=1 to skip both evaluations (training only).
 
 set -euo pipefail
 
@@ -53,10 +54,6 @@ echo "  Train: $TRAIN_DATA"
 echo "  Test:  $TEST_DATA"
 echo "=================================================="
 
-if [ ! -f "$TEST_DATA" ]; then
-    echo "ERROR: Test data not found: $TEST_DATA"
-    exit 1
-fi
 if [ ! -f "$TRAIN_DATA" ]; then
     echo "ERROR: Train data not found: $TRAIN_DATA"
     exit 1
@@ -94,11 +91,17 @@ stop_inference() {
     wait $INFERENCE_PID 2>/dev/null || true
 }
 
-echo ""
-echo "=== 1. Starting inference server ==="
-start_inference "$MODEL"
+# === 1. Baseline evaluation ===
+if [ "${SKIP_BASELINE:-0}" != "1" ] && [ "${SKIP_EVAL:-0}" != "1" ]; then
+    if [ ! -f "$TEST_DATA" ]; then
+        echo "ERROR: Test data not found: $TEST_DATA"
+        exit 1
+    fi
 
-if [ "${SKIP_BASELINE:-0}" != "1" ]; then
+    echo ""
+    echo "=== 1. Starting inference server (baseline) ==="
+    start_inference "$MODEL"
+
     echo ""
     echo "=== 2. Baseline evaluation ==="
     uv run python scripts/sdft/evaluate.py \
@@ -109,53 +112,62 @@ if [ "${SKIP_BASELINE:-0}" != "1" ]; then
         --temperature 0.0 \
         --label baseline \
         --output "$RESULTS_DIR/baseline.json"
+
+    echo ""
+    echo "=== Stopping inference server ==="
+    stop_inference
 fi
 
+# === 2. Training (uv run sdft manages its own inference server) ===
 echo ""
 echo "=== 3. Starting SDFT training ==="
 uv run sdft @ "$CONFIG" \
     --trainer.data.dataset_name="$TRAIN_DATA" \
     "${EXTRA_ARGS[@]}"
 
-echo ""
-echo "=== 4. Stopping inference server ==="
-stop_inference
+# === 3. Trained model evaluation ===
+if [ "${SKIP_EVAL:-0}" != "1" ]; then
+    if [ ! -f "$TEST_DATA" ]; then
+        echo "ERROR: Test data not found: $TEST_DATA"
+        exit 1
+    fi
 
-# Find latest checkpoint
-LATEST_STEP=$(cat "$OUTPUT_DIR/weights/latest_step.txt" 2>/dev/null || ls -1 "$OUTPUT_DIR/weights/" | sort -n | tail -1)
-CHECKPOINT="$OUTPUT_DIR/weights/$LATEST_STEP"
+    # Find latest checkpoint
+    LATEST_STEP=$(cat "$OUTPUT_DIR/weights/latest_step.txt" 2>/dev/null || ls -1 "$OUTPUT_DIR/weights/" | sort -n | tail -1)
+    CHECKPOINT="$OUTPUT_DIR/weights/$LATEST_STEP"
 
-if [ ! -d "$CHECKPOINT" ]; then
-    echo "ERROR: No checkpoint found at $CHECKPOINT"
-    exit 1
-fi
-echo "Using checkpoint: $CHECKPOINT"
+    if [ ! -d "$CHECKPOINT" ]; then
+        echo "ERROR: No checkpoint found at $CHECKPOINT"
+        exit 1
+    fi
+    echo "Using checkpoint: $CHECKPOINT"
 
-echo ""
-echo "=== 5. Starting inference server (trained) ==="
-start_inference "$CHECKPOINT"
+    echo ""
+    echo "=== 4. Starting inference server (trained) ==="
+    start_inference "$CHECKPOINT"
 
-echo ""
-echo "=== 6. Trained model evaluation ==="
-uv run python scripts/sdft/evaluate.py \
-    --test-data "$TEST_DATA" \
-    --base-url "$BASE_URL" \
-    --model "$MODEL" \
-    --num-completions 1 \
-    --temperature 0.0 \
-    --label trained \
-    --output "$RESULTS_DIR/trained.json"
+    echo ""
+    echo "=== 5. Trained model evaluation ==="
+    uv run python scripts/sdft/evaluate.py \
+        --test-data "$TEST_DATA" \
+        --base-url "$BASE_URL" \
+        --model "$MODEL" \
+        --num-completions 1 \
+        --temperature 0.0 \
+        --label trained \
+        --output "$RESULTS_DIR/trained.json"
 
-echo ""
-echo "=== 7. Stopping inference server ==="
-stop_inference
+    echo ""
+    echo "=== Stopping inference server ==="
+    stop_inference
 
-# === 4. Print comparison ===
-echo ""
-echo "=================================================="
-echo "  Results: $NAME"
-echo "=================================================="
-python3 -c "
+    # === 4. Print comparison ===
+    if [ -f "$RESULTS_DIR/baseline.json" ] && [ -f "$RESULTS_DIR/trained.json" ]; then
+        echo ""
+        echo "=================================================="
+        echo "  Results: $NAME"
+        echo "=================================================="
+        python3 -c "
 import json
 baseline = json.load(open('$RESULTS_DIR/baseline.json'))
 trained = json.load(open('$RESULTS_DIR/trained.json'))
@@ -176,5 +188,7 @@ for key in bm:
         print(f'{key:<20} {bv!s:>10} {tv!s:>10}')
 print(f\"{'total':<20} {bm['total']:>10}\")
 "
-echo ""
-echo "Results saved to $RESULTS_DIR/"
+        echo ""
+        echo "Results saved to $RESULTS_DIR/"
+    fi
+fi

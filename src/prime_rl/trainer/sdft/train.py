@@ -16,6 +16,7 @@ from torchtitan.distributed.utils import clip_grad_norm_
 
 from prime_rl.trainer.ckpt import setup_ckpt_managers
 from prime_rl.trainer.model import forward, setup_model, setup_tokenizer
+from prime_rl.trainer.models.layers.lm_head import PrimeLmOutput
 from prime_rl.trainer.optim import setup_optimizer
 from prime_rl.trainer.parallel_dims import get_parallel_dims
 from prime_rl.trainer.runs import Progress
@@ -228,9 +229,23 @@ def _compute_token_log_probs(logits: torch.Tensor, input_ids: torch.Tensor) -> t
 
 
 def forward_hidden(model: torch.nn.Module, input_ids: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
-    """Get hidden states from the model backbone without going through lm_head."""
-    outputs = model.model(input_ids=input_ids, position_ids=position_ids)
-    return outputs.last_hidden_state
+    """Get hidden states without computing lm_head logits.
+
+    Calls the full model forward (respecting FSDP's single-root constraint) but
+    temporarily replaces lm_head.forward with a passthrough that captures hidden
+    states without the expensive [N, V] matmul.
+    """
+    hidden_ref: list[torch.Tensor] = []
+    original_forward = model.lm_head.forward
+
+    def capture_hidden(hidden_states, labels=None, temperature=None):
+        hidden_ref.append(hidden_states)
+        return PrimeLmOutput()
+
+    model.lm_head.forward = capture_hidden
+    model(input_ids=input_ids, position_ids=position_ids)
+    model.lm_head.forward = original_forward
+    return hidden_ref[0]
 
 
 def _extract_completion_values(values: torch.Tensor, completion_mask: torch.Tensor) -> torch.Tensor:

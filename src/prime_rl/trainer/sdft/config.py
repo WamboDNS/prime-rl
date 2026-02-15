@@ -233,8 +233,13 @@ class SDFTTrainerConfig(BaseSettings):
 
     max_steps: Annotated[
         int | None,
-        Field(description="Maximum number of training steps. If None, runs indefinitely."),
+        Field(description="Maximum number of training steps. If None, derived from num_epochs."),
     ] = None
+
+    num_epochs: Annotated[
+        int,
+        Field(description="Number of passes over the dataset."),
+    ] = 30
 
     dist_timeout_seconds: Annotated[
         int,

@@ -318,14 +318,22 @@ def train(config: SDFTTrainerConfig):
     logger.info(f"Initializing optimizer ({config.optim})")
     optimizer = setup_optimizer(config.optim, list(model.named_parameters()), parallel_dims)
 
-    scheduler_steps = config.max_steps
-    logger.info(f"Setting up {config.scheduler.type} scheduler with {scheduler_steps} steps")
-    scheduler = setup_scheduler(optimizer, config.scheduler, scheduler_steps, config.optim.lr)
-
     num_prompts_per_batch = config.data.batch_size // config.generation.num_completions
     logger.info(f"Initializing dataset ({config.data})")
     dataset = setup_sdft_dataset(config.data, num_prompts_per_batch)
     dataset_iter = iter(dataset)
+
+    # Compute max_steps from num_epochs if not explicitly set
+    max_steps = config.max_steps
+    if max_steps is None and hasattr(dataset, "num_examples"):
+        dataset_steps_per_gen = num_prompts_per_batch * dataset.data_world_size
+        gen_batches_per_epoch = (dataset.num_examples + dataset_steps_per_gen - 1) // dataset_steps_per_gen
+        steps_per_gen_batch = (config.data.batch_size // mini_batch_size) * config.generation.num_iterations
+        max_steps = gen_batches_per_epoch * steps_per_gen_batch * config.num_epochs
+        logger.info(f"Training for {config.num_epochs} epochs ({max_steps} optimizer steps, {dataset.num_examples} examples)")
+
+    logger.info(f"Setting up {config.scheduler.type} scheduler with {max_steps} steps")
+    scheduler = setup_scheduler(optimizer, config.scheduler, max_steps, config.optim.lr)
 
     progress = Progress()
     if checkpoint_step is not None:
@@ -344,14 +352,14 @@ def train(config: SDFTTrainerConfig):
     single_step_per_batch = (config.generation.num_iterations == 1 and mini_batch_size == config.data.batch_size)
     needs_is = is_clip is not None and not single_step_per_batch
 
-    logger.info(f"Starting training loop (max_steps={config.max_steps or 'infinite'})")
+    logger.info(f"Starting training loop (max_steps={max_steps or 'infinite'})")
     max_memory = torch.cuda.mem_get_info()[1] / 1024**3
 
     buffer = []
     buffer_idx = 0
 
     while True:
-        is_last_step = config.max_steps is not None and progress.step == config.max_steps
+        is_last_step = max_steps is not None and progress.step == max_steps
 
         # Checkpoint saving
         if (
@@ -369,7 +377,7 @@ def train(config: SDFTTrainerConfig):
                 weight_ckpt_manager.save(progress.step, model, tokenizer)
                 weight_ckpt_manager.maybe_clean()
 
-        if config.max_steps is not None and progress.step >= config.max_steps:
+        if max_steps is not None and progress.step >= max_steps:
             break
 
         # === Generation phase ===

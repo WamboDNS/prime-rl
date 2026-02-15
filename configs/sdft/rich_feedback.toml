@@ -23,7 +23,7 @@ answer_field = "answer"
 kind_field = "kind"
 batch_size = 32
 mini_batch_size = 1
-micro_batch_size = 2
+micro_batch_size = 1
 
 [trainer.loss]
 alpha = 1.0

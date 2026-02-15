@@ -18,7 +18,7 @@ batch_size = 32
 micro_batch_size = 4
 
 [trainer.loss]
-alpha = 0.0  # forward KL
+alpha = 1.0  # reverse KL
 temperature = 1.0
 num_loss_tokens_to_skip = 3
 
@@ -37,7 +37,7 @@ num_iterations = 1
 [trainer.optim]
 type = "adamw"
 lr = 2e-5
-weight_decay = 0.01
+weight_decay = 0.0
 
 [trainer.scheduler]
 type = "cosine"

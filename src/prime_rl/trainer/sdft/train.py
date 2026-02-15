@@ -389,7 +389,7 @@ def train(config: SDFTTrainerConfig):
                     teacher_comp_logits, aligned_mask, config.loss.top_entropy_quantile
                 )
 
-            # Compute importance sampling weights
+            # Compute per-token importance sampling weights
             importance_weights = None
             if config.loss.importance_sampling:
                 sampling_lps = _extract_completion_values(
@@ -398,10 +398,8 @@ def train(config: SDFTTrainerConfig):
                 old_lps = _extract_completion_values(
                     micro_batch["old_per_token_logps"].to("cuda"), completion_mask
                 )
-                ratio = torch.exp(old_lps - sampling_lps).clamp(max=config.loss.importance_sampling_cap)
-                importance_weights = (ratio * aligned_mask).sum(-1) / aligned_mask.sum(-1).clamp(min=1)
-                importance_weights = importance_weights.unsqueeze(-1)
-                batch_is_mean += importance_weights.mean().detach() / grad_accum_steps
+                importance_weights = torch.exp(old_lps - sampling_lps).clamp(max=config.loss.importance_sampling_cap)
+                batch_is_mean += (importance_weights * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
                 batch_is_max = torch.max(batch_is_max, importance_weights.max().detach())
 
             # Compute KL loss

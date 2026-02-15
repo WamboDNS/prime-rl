@@ -10,7 +10,7 @@ def sdft_kl_loss(
     completion_mask: Bool[Tensor, "batch seq"],
     alpha: float = 0.0,
     temperature: float = 1.0,
-    importance_weights: Float[Tensor, "batch 1"] | None = None,
+    importance_weights: Float[Tensor, "batch seq"] | None = None,
 ) -> tuple[Float[Tensor, ""], dict[str, Tensor]]:
     """Full-vocabulary KL divergence between student and teacher distributions.
 

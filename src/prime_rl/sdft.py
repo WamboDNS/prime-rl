@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import time
+import urllib.request
 import uuid
 from pathlib import Path
 from subprocess import Popen
@@ -139,6 +140,22 @@ def sdft(config: SDFTConfig):
             )
             monitor_thread.start()
             monitor_threads.append(monitor_thread)
+            # Wait for inference server to be ready before starting trainer
+            base_url = config.trainer.client.base_url[0]
+            logger.info(f"Waiting for inference server at {base_url}...")
+            for _ in range(120):
+                if error_queue:
+                    break
+                try:
+                    urllib.request.urlopen(f"{base_url}/models", timeout=5)
+                    logger.info("Inference server ready.")
+                    break
+                except Exception:
+                    time.sleep(5)
+            else:
+                logger.error("Inference server did not start within 10 minutes")
+                cleanup_processes(processes)
+                sys.exit(1)
         else:
             logger.warning("No inference config specified. Is your inference server running?")
 

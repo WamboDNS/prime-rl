@@ -29,8 +29,18 @@ TRAIN_DATA="$DATASET_DIR/train.json"
 RESULTS_DIR="results/${NAME}"
 BASE_URL="${BASE_URL:-http://localhost:8000/v1}"
 
-# Read model name from config (first match)
-MODEL=$(grep -m1 'name\s*=' "$CONFIG" | sed 's/.*=\s*"\(.*\)".*/\1/')
+# Extract config values using Python (handles TOML correctly)
+read -r MODEL INFERENCE_GPUS OUTPUT_DIR MAX_MODEL_LEN PORT < <(python3 -c "
+import tomllib
+with open('$CONFIG', 'rb') as f:
+    cfg = tomllib.load(f)
+model = cfg.get('trainer', {}).get('model', {}).get('name', 'Qwen/Qwen3-8B')
+gpus = ','.join(str(g) for g in cfg.get('inference_gpu_ids', [0]))
+output_dir = cfg.get('trainer', {}).get('output_dir', 'outputs')
+max_model_len = cfg.get('inference', {}).get('model', {}).get('max_model_len', '')
+port = cfg.get('inference', {}).get('server', {}).get('port', 8000)
+print(model, gpus, output_dir, max_model_len, port)
+")
 
 mkdir -p "$RESULTS_DIR"
 
@@ -64,12 +74,29 @@ wait_for_server() {
     exit 1
 }
 
+start_inference() {
+    local model_name="$1"
+    local inference_args=(
+        --model.name "$model_name"
+        --server.port "$PORT"
+    )
+    if [ -n "$MAX_MODEL_LEN" ]; then
+        inference_args+=(--model.max-model-len "$MAX_MODEL_LEN")
+    fi
+    CUDA_VISIBLE_DEVICES="$INFERENCE_GPUS" uv run inference "${inference_args[@]}" &
+    INFERENCE_PID=$!
+    wait_for_server
+}
+
+stop_inference() {
+    kill $INFERENCE_PID
+    wait $INFERENCE_PID 2>/dev/null || true
+}
+
 # === 1. Baseline evaluation ===
 echo ""
 echo "=== 1. Starting inference server (baseline) ==="
-uv run inference @ "$CONFIG" &
-INFERENCE_PID=$!
-wait_for_server
+start_inference "$MODEL"
 
 echo ""
 echo "=== 2. Baseline evaluation ==="
@@ -84,8 +111,7 @@ uv run python scripts/sdft/evaluate.py \
 
 echo ""
 echo "=== 3. Stopping inference server ==="
-kill $INFERENCE_PID
-wait $INFERENCE_PID 2>/dev/null || true
+stop_inference
 
 # === 2. Training ===
 echo ""
@@ -95,7 +121,6 @@ uv run sdft @ "$CONFIG" \
     "${EXTRA_ARGS[@]}"
 
 # Find latest checkpoint
-OUTPUT_DIR=$(grep -m1 'output_dir' "$CONFIG" | sed 's/.*=\s*"\(.*\)".*/\1/')
 LATEST_STEP=$(cat "$OUTPUT_DIR/weights/latest_step.txt" 2>/dev/null || ls -1 "$OUTPUT_DIR/weights/" | sort -n | tail -1)
 CHECKPOINT="$OUTPUT_DIR/weights/$LATEST_STEP"
 
@@ -108,9 +133,7 @@ echo "Using checkpoint: $CHECKPOINT"
 # === 3. Trained model evaluation ===
 echo ""
 echo "=== 5. Starting inference server (trained) ==="
-uv run inference @ "$CONFIG" --model.name "$CHECKPOINT" &
-INFERENCE_PID=$!
-wait_for_server
+start_inference "$CHECKPOINT"
 
 echo ""
 echo "=== 6. Trained model evaluation ==="
@@ -125,8 +148,7 @@ uv run python scripts/sdft/evaluate.py \
 
 echo ""
 echo "=== 7. Stopping inference server ==="
-kill $INFERENCE_PID
-wait $INFERENCE_PID 2>/dev/null || true
+stop_inference
 
 # === 4. Print comparison ===
 echo ""

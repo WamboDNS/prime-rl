@@ -290,6 +290,11 @@ def train(config: SDFTTrainerConfig):
 
     mini_batch_size = config.data.mini_batch_size
     grad_accum_steps = mini_batch_size // config.data.micro_batch_size
+    logger.info(
+        f"Batch config: batch_size={config.data.batch_size}, mini_batch_size={mini_batch_size}, "
+        f"micro_batch_size={config.data.micro_batch_size}, grad_accum_steps={grad_accum_steps}, "
+        f"optimizer_steps_per_batch={config.data.batch_size // mini_batch_size}"
+    )
 
     ckpt_manager, weight_ckpt_manager = setup_ckpt_managers(config.output_dir, config.ckpt, config.model.lora)
 

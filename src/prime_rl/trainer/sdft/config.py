@@ -239,7 +239,7 @@ class SDFTTrainerConfig(BaseSettings):
     num_epochs: Annotated[
         int,
         Field(description="Number of passes over the dataset."),
-    ] = 30
+    ] = 100
 
     dist_timeout_seconds: Annotated[
         int,

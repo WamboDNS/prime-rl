@@ -42,7 +42,7 @@ class SDFTLossConfig(BaseConfig):
     fused_distillation: Annotated[
         bool,
         Field(description="Use chunked fused distillation to avoid materializing [N, V] logit tensors."),
-    ] = False
+    ] = True
 
     distillation_chunk_size: Annotated[
         int,

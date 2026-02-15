@@ -55,6 +55,10 @@ warmup_steps = 10
 [trainer.wandb]
 project = "SDPO-generalization"
 
+[trainer.ckpt]
+interval = 30
+keep_last = 3
+
 [trainer]
 output_dir = "outputs/sdpo-generalization"
 

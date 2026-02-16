@@ -261,6 +261,24 @@ def _estimate_logits_memory_gib(tokens: int, vocab_size: int, bytes_per_elem: in
     return (tokens * vocab_size * bytes_per_elem) / (1024**3)
 
 
+def _completion_token_mask(completion_mask: torch.Tensor) -> torch.Tensor:
+    """Build [batch, max_completion_len] mask for valid completion tokens."""
+    lengths = completion_mask.sum(dim=-1)
+    max_len = int(lengths.max().item())
+    if max_len == 0:
+        return torch.zeros(completion_mask.shape[0], 1, dtype=torch.bool, device=completion_mask.device)
+    positions = torch.arange(max_len, device=completion_mask.device).unsqueeze(0)
+    return positions < lengths.unsqueeze(1)
+
+
+def _scatter_flat_by_mask(flat: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Scatter flattened valid-token tensor back to [batch, max_len, ...] padded form."""
+    out_shape = (mask.shape[0], mask.shape[1], *flat.shape[1:])
+    out = torch.zeros(out_shape, device=flat.device, dtype=flat.dtype)
+    out[mask] = flat
+    return out
+
+
 def forward_hidden(model: torch.nn.Module, input_ids: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
     """Get hidden states without computing lm_head logits.
 
@@ -612,6 +630,13 @@ def train(config: SDFTTrainerConfig):
 
             active_teacher = teacher_model if teacher_model is not None else model
             sd_mask = micro_batch["self_distillation_mask"].to("cuda")
+            student_comp_token_mask = _completion_token_mask(completion_mask)
+            teacher_comp_token_mask = _completion_token_mask(teacher_completion_mask)
+
+            if not torch.equal(student_comp_token_mask, teacher_comp_token_mask):
+                raise RuntimeError("Student/teacher completion token masks are misaligned")
+
+            aligned_mask = student_comp_token_mask & sd_mask.unsqueeze(1).bool()
 
             if config.loss.fused_distillation:
                 # Fused path: operate on hidden states, never materialize [N, V]
@@ -620,15 +645,8 @@ def train(config: SDFTTrainerConfig):
                 with torch.no_grad():
                     teacher_hidden = forward_hidden(active_teacher, teacher_input_ids, teacher_position_ids)
 
-                student_comp_hidden = _extract_completion_logits(student_hidden, completion_mask)
-                teacher_comp_hidden = _extract_completion_logits(teacher_hidden, teacher_completion_mask)
-
-                B = student_comp_hidden.shape[0]
-                comp_len = student_comp_hidden.shape[1]
-                H = student_comp_hidden.shape[2]
-
-                s_flat = student_comp_hidden.reshape(-1, H)
-                t_flat = teacher_comp_hidden.reshape(-1, H)
+                s_flat = student_hidden[completion_mask]
+                t_flat = teacher_hidden[teacher_completion_mask]
                 lm_weight = model.lm_head.weight
 
                 student_topk_lp, teacher_topk_lp, _ = fused_distill_topk(
@@ -637,8 +655,8 @@ def train(config: SDFTTrainerConfig):
                     chunk_size=config.loss.distillation_chunk_size,
                 )
 
-                student_topk_lp = student_topk_lp.reshape(B, comp_len, distillation_topk)
-                teacher_topk_lp = teacher_topk_lp.reshape(B, comp_len, distillation_topk)
+                student_topk_lp = _scatter_flat_by_mask(student_topk_lp, student_comp_token_mask)
+                teacher_topk_lp = _scatter_flat_by_mask(teacher_topk_lp, student_comp_token_mask)
 
                 if config.loss.distillation_add_tail:
                     student_distill_lp = add_tail(student_topk_lp)
@@ -647,10 +665,7 @@ def train(config: SDFTTrainerConfig):
                     student_distill_lp = renorm_topk_log_probs(student_topk_lp)
                     teacher_distill_lp = renorm_topk_log_probs(teacher_topk_lp)
 
-                aligned_mask = torch.ones(B, comp_len, dtype=torch.bool, device="cuda")
-                aligned_mask = aligned_mask * sd_mask.unsqueeze(1).bool()
-
-                # IS correction still needs full forward for token-level log probs
+                # IS correction from hidden states to avoid [B,S,V] logits materialization.
                 is_ratio = None
                 if needs_is:
                     with torch.no_grad():
@@ -660,9 +675,9 @@ def train(config: SDFTTrainerConfig):
                             lm_weight=lm_weight,
                             chunk_size=config.loss.distillation_chunk_size,
                         )
-                    student_token_lp_comp = _extract_completion_values(student_token_lp, completion_mask)
+                    student_token_lp_comp = _scatter_flat_by_mask(student_token_lp[completion_mask], student_comp_token_mask)
                     old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
-                    old_token_lp_comp = _extract_completion_values(old_token_lp_comp, completion_mask)
+                    old_token_lp_comp = _scatter_flat_by_mask(old_token_lp_comp[completion_mask], student_comp_token_mask)
 
                     negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
                     negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
@@ -682,7 +697,7 @@ def train(config: SDFTTrainerConfig):
                 batch_loss += loss.detach() / grad_accum_steps
                 batch_kl += metrics["kl_divergence"] / grad_accum_steps
 
-                del student_hidden, teacher_hidden, student_comp_hidden, teacher_comp_hidden
+                del student_hidden, teacher_hidden
                 del student_distill_lp, teacher_distill_lp
 
                 (loss / grad_accum_steps).backward()
@@ -709,10 +724,6 @@ def train(config: SDFTTrainerConfig):
 
                 student_comp_logits = _extract_completion_logits(student_logits, completion_mask)
                 teacher_comp_logits = _extract_completion_logits(teacher_logits, teacher_completion_mask)
-
-                comp_len = student_comp_logits.shape[1]
-                aligned_mask = torch.ones(student_comp_logits.shape[0], comp_len, dtype=torch.bool, device="cuda")
-                aligned_mask = aligned_mask * sd_mask.unsqueeze(1).bool()
 
                 student_comp_log_probs = student_comp_logits.log_softmax(dim=-1)
                 with torch.no_grad():

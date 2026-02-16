@@ -614,10 +614,13 @@ def train(config: SDFTTrainerConfig):
         batch_kl = torch.tensor(0.0, device="cuda")
         batch_is_mean = torch.tensor(0.0, device="cuda")
         batch_is_max = torch.tensor(0.0, device="cuda")
+        micro_steps_available = len(buffer) - buffer_idx
+        micro_steps_this_step = min(grad_accum_steps, max(micro_steps_available, 0))
 
         for micro_step in range(grad_accum_steps):
             if buffer_idx >= len(buffer):
                 break
+            micro_step_idx = micro_step + 1
             micro_batch = buffer[buffer_idx]
             buffer_idx += 1
 
@@ -773,6 +776,13 @@ def train(config: SDFTTrainerConfig):
                 del student_comp_log_probs, teacher_comp_log_probs, student_distill_lp, teacher_distill_lp
 
                 (loss / grad_accum_steps).backward()
+
+            logger.info(
+                "Microbatch done: "
+                f"optimizer_step={progress.step}, "
+                f"micro_step={micro_step_idx}/{micro_steps_this_step}, "
+                f"buffer={buffer_idx}/{len(buffer)}"
+            )
 
         # Optimizer step
         grad_norm = clip_grad_norm_(model.parameters(), max_norm=config.optim.max_norm, ep_enabled=False)

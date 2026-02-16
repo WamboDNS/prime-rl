@@ -26,8 +26,8 @@ answer_field = "answer"
 kind_field = "kind"
 batch_size = 32
 mini_batch_size = 32
-# Keep micro-batch per GPU at 1 to match SDPO memory behavior.
-micro_batch_size = 1
+# Use micro-batch per GPU = 2 on 80GB cards for higher throughput.
+micro_batch_size = 2
 
 [trainer.loss]
 alpha = 0.5

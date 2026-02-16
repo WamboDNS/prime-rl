@@ -257,6 +257,10 @@ def _compute_token_log_probs_from_hidden(
     return F.pad(token_lps, (1, 0), value=0.0)
 
 
+def _estimate_logits_memory_gib(tokens: int, vocab_size: int, bytes_per_elem: int) -> float:
+    return (tokens * vocab_size * bytes_per_elem) / (1024**3)
+
+
 def forward_hidden(model: torch.nn.Module, input_ids: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
     """Get hidden states without computing lm_head logits.
 
@@ -394,6 +398,7 @@ def train(config: SDFTTrainerConfig):
 
     buffer = []
     buffer_idx = 0
+    last_microbatch_signature = None
 
     while True:
         is_last_step = max_steps is not None and progress.step == max_steps
@@ -524,6 +529,39 @@ def train(config: SDFTTrainerConfig):
             for mb_idx in range(0, config.data.batch_size, bs):
                 mb = {k: v[mb_idx : mb_idx + bs] for k, v in train_batch.items()}
                 buffer.append(mb)
+
+            student_seq_len = train_batch["student_input_ids"].shape[1]
+            teacher_seq_len = train_batch["teacher_input_ids"].shape[1]
+            max_seq_len = max(student_seq_len, teacher_seq_len)
+            micro_batch_count = len(buffer)
+            completion_tokens = train_batch["completion_mask"].sum(dim=-1)
+            max_completion_tokens = int(completion_tokens.max().item()) if completion_tokens.numel() > 0 else 0
+            avg_completion_tokens = completion_tokens.float().mean().item() if completion_tokens.numel() > 0 else 0.0
+
+            signature = (bs, micro_batch_count, student_seq_len, teacher_seq_len, max_completion_tokens)
+            if signature != last_microbatch_signature:
+                last_microbatch_signature = signature
+                vocab_size = model.lm_head.weight.shape[0]
+                tokens_per_micro_batch = bs * max_seq_len
+                logits_bf16_gib = _estimate_logits_memory_gib(tokens_per_micro_batch, vocab_size, bytes_per_elem=2)
+                logits_fp32_gib = _estimate_logits_memory_gib(tokens_per_micro_batch, vocab_size, bytes_per_elem=4)
+
+                logger.info(
+                    "Microbatching summary: "
+                    f"micro_batch_size={bs}, micro_batches_per_gen={micro_batch_count}, "
+                    f"grad_accum_steps={grad_accum_steps}, student_seq_len={student_seq_len}, "
+                    f"teacher_seq_len={teacher_seq_len}, completion_tokens(avg/max)={avg_completion_tokens:.1f}/{max_completion_tokens}"
+                )
+                logger.info(
+                    "Microbatching memory estimate (single [B,S,V] tensor): "
+                    f"tokens_per_micro_batch={tokens_per_micro_batch}, vocab={vocab_size}, "
+                    f"bf16={logits_bf16_gib:.1f} GiB, fp32={logits_fp32_gib:.1f} GiB"
+                )
+                if logits_fp32_gib > max_memory * 0.7:
+                    logger.warning(
+                        "Estimated fp32 logits tensor is >=70% of device memory. "
+                        f"Consider lowering micro_batch_size (current {bs})."
+                    )
 
             # Compute old logprobs for IS correction before any optimizer steps
             if needs_is:

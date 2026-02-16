@@ -26,7 +26,10 @@ from prime_rl.trainer.sdft.data import (
     prepare_sdft_batch,
     setup_sdft_dataset,
 )
-from prime_rl.trainer.sdft.fused_distill import fused_distill_topk
+from prime_rl.trainer.sdft.fused_distill import (
+    chunked_token_log_probs_from_hidden,
+    fused_distill_topk,
+)
 from prime_rl.trainer.sdft.loss import add_tail, renorm_topk_log_probs, sdft_kl_loss
 from prime_rl.trainer.sdft.scoring import score_completion
 from prime_rl.trainer.utils import setup_torch_distributed
@@ -225,6 +228,32 @@ def _compute_token_log_probs(logits: torch.Tensor, input_ids: torch.Tensor) -> t
     """
     log_probs = logits[:, :-1, :].log_softmax(dim=-1)
     token_lps = log_probs.gather(dim=-1, index=input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
+    return F.pad(token_lps, (1, 0), value=0.0)
+
+
+def _compute_token_log_probs_from_hidden(
+    hidden: torch.Tensor,
+    input_ids: torch.Tensor,
+    lm_weight: torch.Tensor,
+    chunk_size: int,
+) -> torch.Tensor:
+    """Compute per-token log probabilities from hidden states in chunked fashion.
+
+    Avoids materializing [batch, seq, vocab] logits for IS correction in fused SDFT.
+    """
+    batch_size, seq_len, hidden_dim = hidden.shape
+    if seq_len <= 1:
+        return torch.zeros(batch_size, seq_len, device=hidden.device, dtype=torch.float32)
+
+    hidden_flat = hidden[:, :-1, :].reshape(-1, hidden_dim).contiguous()
+    labels_flat = input_ids[:, 1:].reshape(-1).contiguous()
+    token_lps_flat = chunked_token_log_probs_from_hidden(
+        hidden=hidden_flat,
+        next_token_ids=labels_flat,
+        weight=lm_weight,
+        chunk_size=chunk_size,
+    )
+    token_lps = token_lps_flat.reshape(batch_size, seq_len - 1)
     return F.pad(token_lps, (1, 0), value=0.0)
 
 
@@ -503,9 +532,15 @@ def train(config: SDFTTrainerConfig):
                     for mb in buffer:
                         ids = mb["student_input_ids"].to("cuda")
                         pos = mb["student_position_ids"].to("cuda")
-                        out = forward(model, ids, pos)
-                        token_lps = _compute_token_log_probs(out["logits"], ids)
+                        hidden = forward_hidden(model, ids, pos)
+                        token_lps = _compute_token_log_probs_from_hidden(
+                            hidden=hidden,
+                            input_ids=ids,
+                            lm_weight=model.lm_head.weight,
+                            chunk_size=config.loss.distillation_chunk_size,
+                        )
                         mb["old_token_log_probs"] = token_lps.cpu()
+                        del hidden
 
             # Repeat buffer for multi-iteration (off-policy) training
             if config.generation.num_iterations > 1:
@@ -581,9 +616,12 @@ def train(config: SDFTTrainerConfig):
                 is_ratio = None
                 if needs_is:
                     with torch.no_grad():
-                        student_out = forward(model, student_input_ids, student_position_ids)
-                        student_logits = student_out["logits"]
-                    student_token_lp = _compute_token_log_probs(student_logits, student_input_ids)
+                        student_token_lp = _compute_token_log_probs_from_hidden(
+                            hidden=student_hidden.detach(),
+                            input_ids=student_input_ids,
+                            lm_weight=lm_weight,
+                            chunk_size=config.loss.distillation_chunk_size,
+                        )
                     student_token_lp_comp = _extract_completion_values(student_token_lp, completion_mask)
                     old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
                     old_token_lp_comp = _extract_completion_values(old_token_lp_comp, completion_mask)
@@ -594,7 +632,6 @@ def train(config: SDFTTrainerConfig):
 
                     batch_is_mean += (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
                     batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
-                    del student_logits
 
                 loss, metrics = sdft_kl_loss(
                     student_distill_lp,

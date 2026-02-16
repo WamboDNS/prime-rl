@@ -190,3 +190,43 @@ def fused_distill_topk(
     topk_indices, teacher_topk_lp = chunked_teacher_topk(teacher_hidden, weight, K, chunk_size)
     student_topk_lp = _ChunkedStudentGatherFn.apply(student_hidden, weight, topk_indices, chunk_size)
     return student_topk_lp, teacher_topk_lp, topk_indices
+
+
+@torch.no_grad()
+def chunked_token_log_probs_from_hidden(
+    hidden: Tensor,
+    next_token_ids: Tensor,
+    weight: Tensor,
+    chunk_size: int = 2048,
+) -> Tensor:
+    """Compute token log probs from hidden states without materializing [N, V] logits.
+
+    Args:
+        hidden: [N, H] hidden states
+        next_token_ids: [N] token ids for the next-token targets
+        weight: [V, H] lm_head weight
+        chunk_size: vocab chunk size
+
+    Returns:
+        token_log_probs: [N] log p(next_token_id | hidden)
+    """
+    n = hidden.shape[0]
+    vocab = weight.shape[0]
+    device = hidden.device
+
+    m = torch.full((n,), float("-inf"), device=device, dtype=torch.float32)
+    s = torch.zeros((n,), device=device, dtype=torch.float32)
+    target_logits = torch.zeros((n,), device=device, dtype=torch.float32)
+
+    for start in range(0, vocab, chunk_size):
+        end = min(start + chunk_size, vocab)
+        logits = (hidden @ weight[start:end].t()).float()  # [N, C]
+        m, s = _online_logsumexp(m, s, logits)
+
+        mask = (next_token_ids >= start) & (next_token_ids < end)
+        if mask.any():
+            local_idx = (next_token_ids[mask] - start).to(torch.long)
+            target_logits[mask] = logits[mask, local_idx]
+
+    logz = m + torch.log(s)
+    return target_logits - logz

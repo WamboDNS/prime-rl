@@ -652,11 +652,21 @@ def train(config: SDFTTrainerConfig):
             else:
                 # Standard path: full [N, V] logit tensors
                 with maybe_activation_offloading(config.model.ac_offloading):
-                    student_out = forward(model, student_input_ids, student_position_ids)
+                    student_out = forward(
+                        model,
+                        student_input_ids,
+                        student_position_ids,
+                        cast_output_to_float=False,
+                    )
                 student_logits = student_out["logits"]
 
                 with torch.no_grad():
-                    teacher_out = forward(active_teacher, teacher_input_ids, teacher_position_ids)
+                    teacher_out = forward(
+                        active_teacher,
+                        teacher_input_ids,
+                        teacher_position_ids,
+                        cast_output_to_float=False,
+                    )
                     teacher_logits = teacher_out["logits"]
 
                 student_comp_logits = _extract_completion_logits(student_logits, completion_mask)

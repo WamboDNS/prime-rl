@@ -26,7 +26,6 @@ from prime_rl.trainer.models import (
     AutoModelForCausalLMPrimeRL,
     PreTrainedModelPrimeRL,
     PrimeLmOutput,
-    cast_float_and_contiguous,
     supports_custom_impl,
 )
 from prime_rl.trainer.models.layers.lm_head import inject_prime_lm_head
@@ -664,6 +663,7 @@ def forward(
     position_ids: Int[Tensor, "batch seq"],
     labels: Int[Tensor, "batch seq"] | None = None,
     temperature: Tensor | None = None,
+    cast_output_to_float: bool = True,
     # Multimodal fields (Qwen3-VL)
     pixel_values: Float[Tensor, "num_patches patch_dim"] | None = None,
     image_grid_thw: Int[Tensor, "num_images 3"] | None = None,
@@ -686,8 +686,22 @@ def forward(
 
     out = model(**kwargs)
 
+    def _normalize_tensor(tensor: Tensor | None) -> Tensor | None:
+        if tensor is None:
+            return None
+        if cast_output_to_float:
+            return tensor.float().contiguous()
+        return tensor.contiguous()
+
+    def _normalize_output(output: PrimeLmOutput) -> PrimeLmOutput:
+        return PrimeLmOutput(
+            logits=_normalize_tensor(output.get("logits")),
+            logprobs=_normalize_tensor(output.get("logprobs")),
+            entropy=_normalize_tensor(output.get("entropy")),
+        )
+
     # PrimeLmOutput is a TypedDict (dict at runtime), HF outputs are dataclass-like objects
     if isinstance(out, dict):
-        return cast_float_and_contiguous(out)
+        return _normalize_output(out)
 
-    return cast_float_and_contiguous(PrimeLmOutput(logits=out.logits))
+    return _normalize_output(PrimeLmOutput(logits=out.logits))

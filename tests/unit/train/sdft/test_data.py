@@ -107,3 +107,34 @@ def test_truncation(tokenizer):
 
     assert batch["student_input_ids"].shape[1] <= 32 + 16
     assert batch["teacher_input_ids"].shape[1] <= 32 + 16
+
+
+def test_system_messages_are_preserved(tokenizer):
+    """System messages are included in both student and teacher contexts."""
+    student_prompts = ["Explain 2+2"]
+    teacher_prompts = ["Explain 2+2 with example"]
+    completions = ["The answer is 4."]
+
+    batch_no_system = prepare_sdft_batch(
+        student_prompts=student_prompts,
+        teacher_prompts=teacher_prompts,
+        completions=completions,
+        self_distillation_mask=[True],
+        tokenizer=tokenizer,
+        max_prompt_length=128,
+        max_completion_length=64,
+    )
+    batch_with_system = prepare_sdft_batch(
+        student_prompts=student_prompts,
+        teacher_prompts=teacher_prompts,
+        completions=completions,
+        self_distillation_mask=[True],
+        tokenizer=tokenizer,
+        max_prompt_length=128,
+        max_completion_length=64,
+        student_systems=["You are a math assistant."],
+        teacher_systems=["You are a math assistant."],
+    )
+
+    assert batch_with_system["student_input_ids"].shape[1] >= batch_no_system["student_input_ids"].shape[1]
+    assert batch_with_system["teacher_input_ids"].shape[1] >= batch_no_system["teacher_input_ids"].shape[1]

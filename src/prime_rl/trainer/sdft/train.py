@@ -83,7 +83,6 @@ def build_teacher_prompts(
     prompts: list[str],
     completions: list[str],
     scores: list[dict],
-    systems: list[str | None],
     num_completions: int,
     reprompt_cfg: SDFTRepromptConfig,
 ) -> tuple[list[str], list[bool]]:
@@ -257,6 +256,24 @@ def _compute_token_log_probs_from_hidden(
     return F.pad(token_lps, (1, 0), value=0.0)
 
 
+def _compute_rollout_is_weights(
+    log_ratio: torch.Tensor,
+    mask: torch.Tensor,
+    rollout_is: str,
+    threshold: float,
+) -> torch.Tensor:
+    """Compute rollout-correction IS weights from log-ratio and mask."""
+    log_ratio = torch.clamp(log_ratio, min=-20.0, max=20.0)
+    if rollout_is == "token":
+        weights = torch.exp(log_ratio)
+    elif rollout_is == "sequence":
+        seq_log_ratio = (log_ratio * mask).sum(dim=-1, keepdim=True)
+        weights = torch.exp(seq_log_ratio).expand_as(log_ratio)
+    else:
+        raise ValueError(f"Unsupported rollout_is mode: {rollout_is}")
+    return weights.clamp(max=threshold).detach()
+
+
 def _estimate_logits_memory_gib(tokens: int, vocab_size: int, bytes_per_elem: int) -> float:
     return (tokens * vocab_size * bytes_per_elem) / (1024**3)
 
@@ -363,10 +380,10 @@ def train(config: SDFTTrainerConfig):
     logger.info(f"Initializing tokenizer ({config.tokenizer})")
     tokenizer = setup_tokenizer(config.tokenizer)
 
-    # EMA teacher model
+    # Teacher model
     teacher_model = None
     if config.ref_model.enabled:
-        logger.info("Initializing EMA teacher model")
+        logger.info(f"Initializing reference teacher model ({config.ref_model.regularization})")
         teacher_model = setup_model(config.model, parallel_dims, loading_from_ckpt_later)
         for param in teacher_model.parameters():
             param.requires_grad = False
@@ -402,11 +419,16 @@ def train(config: SDFTTrainerConfig):
 
     # Loss config shortcuts
     distillation_topk = config.loss.distillation_topk if config.loss.full_logit_distillation else None
-    is_clip = config.loss.is_clip
+    distill_is_clip = config.loss.is_clip
+    rollout_is = config.loss.rollout_is
+    rollout_is_threshold = config.loss.rollout_is_threshold
+    teacher_regularization = config.ref_model.regularization
     # IS correction is needed when the model changes between processing samples in the same generation batch:
     # either multiple optimizer steps per batch (mini_batch_size < batch_size) or multiple iterations.
     single_step_per_batch = (config.generation.num_iterations == 1 and mini_batch_size == config.data.batch_size)
-    needs_is = is_clip is not None and not single_step_per_batch
+    needs_distill_is = distill_is_clip is not None and not single_step_per_batch
+    needs_rollout_is = rollout_is is not None and not single_step_per_batch
+    needs_old_log_probs = needs_distill_is or needs_rollout_is
 
     logger.info(f"Starting training loop (max_steps={max_steps or 'infinite'})")
     max_memory = torch.cuda.mem_get_info()[1] / 1024**3
@@ -479,13 +501,14 @@ def train(config: SDFTTrainerConfig):
                     prompts=prompts,
                     completions=completions,
                     scores=scores,
-                    systems=systems,
                     num_completions=num_completions,
                     reprompt_cfg=config.reprompt,
                 )
 
                 # Expand student prompts to match (each prompt repeated num_completions times)
                 student_prompts = [p for p in prompts for _ in range(num_completions)]
+                student_systems = [s for s in systems for _ in range(num_completions)]
+                teacher_systems = [s for s in systems for _ in range(num_completions)]
 
                 num_success = sum(1 for s in scores if s["score"] >= config.reprompt.success_threshold)
                 num_reprompted = sum(sd_mask)
@@ -497,7 +520,15 @@ def train(config: SDFTTrainerConfig):
                     "gen/avg_score": avg_score,
                     "gen/avg_completion_length": avg_comp_len,
                 }
-                gen_data = (completions, student_prompts, teacher_prompts, sd_mask, gen_metrics)
+                gen_data = (
+                    completions,
+                    student_prompts,
+                    student_systems,
+                    teacher_prompts,
+                    teacher_systems,
+                    sd_mask,
+                    gen_metrics,
+                )
                 logger.info(
                     f"Scored: {num_success}/{len(scores)} successful, "
                     f"{num_reprompted}/{len(sd_mask)} reprompted"
@@ -523,7 +554,7 @@ def train(config: SDFTTrainerConfig):
                 if not world.is_master:
                     gen_data = pickle.loads(data_tensor.cpu().numpy().tobytes())
 
-            completions, student_prompts, teacher_prompts, sd_mask, gen_metrics = gen_data
+            completions, student_prompts, student_systems, teacher_prompts, teacher_systems, sd_mask, gen_metrics = gen_data
 
             gen_time = time.perf_counter() - step_start_time
             gen_metrics["gen/time"] = gen_time
@@ -539,6 +570,8 @@ def train(config: SDFTTrainerConfig):
                 max_prompt_length=config.generation.max_prompt_length,
                 max_completion_length=config.generation.max_completion_length,
                 max_reprompt_length=config.reprompt.max_reprompt_length,
+                student_systems=student_systems,
+                teacher_systems=teacher_systems,
             )
 
             # Split into mini-batches, then micro-batches within each
@@ -581,9 +614,9 @@ def train(config: SDFTTrainerConfig):
                         f"Consider lowering micro_batch_size (current {bs})."
                     )
 
-            # Compute old logprobs for IS correction before any optimizer steps
-            if needs_is:
-                logger.debug("Computing old logprobs for IS correction")
+            # Compute rollout-time logprobs before optimizer updates for IS correction.
+            if needs_old_log_probs:
+                logger.debug("Computing rollout-time logprobs for IS correction")
                 with torch.no_grad():
                     for mb in buffer:
                         ids = mb["student_input_ids"].to("cuda")
@@ -632,6 +665,8 @@ def train(config: SDFTTrainerConfig):
             teacher_completion_mask = micro_batch["teacher_completion_mask"].to("cuda")
 
             active_teacher = teacher_model if teacher_model is not None else model
+            if teacher_regularization == "trust-region" and teacher_model is None:
+                raise RuntimeError("trust-region teacher requires a separate reference model")
             sd_mask = micro_batch["self_distillation_mask"].to("cuda")
             student_comp_token_mask = _completion_token_mask(completion_mask)
             teacher_comp_token_mask = _completion_token_mask(teacher_completion_mask)
@@ -642,6 +677,8 @@ def train(config: SDFTTrainerConfig):
             aligned_mask = student_comp_token_mask & sd_mask.unsqueeze(1).bool()
 
             if config.loss.fused_distillation:
+                if teacher_regularization == "trust-region":
+                    raise RuntimeError("trust-region teacher requires fused_distillation to be disabled")
                 # Fused path: operate on hidden states, never materialize [N, V]
                 with maybe_activation_offloading(config.model.ac_offloading):
                     student_hidden = forward_hidden(model, student_input_ids, student_position_ids)
@@ -670,7 +707,8 @@ def train(config: SDFTTrainerConfig):
 
                 # IS correction from hidden states to avoid [B,S,V] logits materialization.
                 is_ratio = None
-                if needs_is:
+                rollout_is_weights = None
+                if needs_old_log_probs:
                     with torch.no_grad():
                         student_token_lp = _compute_token_log_probs_from_hidden(
                             hidden=student_hidden.detach(),
@@ -684,10 +722,19 @@ def train(config: SDFTTrainerConfig):
 
                     negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
                     negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
-                    is_ratio = torch.exp(negative_approx_kl).clamp(max=is_clip)
-
-                    batch_is_mean += (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
-                    batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
+                    if needs_distill_is:
+                        is_ratio = torch.exp(negative_approx_kl).clamp(max=distill_is_clip)
+                        batch_is_mean += (
+                            (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
+                        )
+                        batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
+                    if needs_rollout_is:
+                        rollout_is_weights = _compute_rollout_is_weights(
+                            log_ratio=negative_approx_kl,
+                            mask=aligned_mask,
+                            rollout_is=rollout_is,
+                            threshold=rollout_is_threshold,
+                        )
 
                 loss, metrics = sdft_kl_loss(
                     student_distill_lp,
@@ -695,6 +742,7 @@ def train(config: SDFTTrainerConfig):
                     aligned_mask,
                     alpha=config.loss.alpha,
                     is_ratio=is_ratio,
+                    rollout_is_weights=rollout_is_weights,
                 )
 
                 batch_loss += loss.detach() / grad_accum_steps
@@ -716,14 +764,28 @@ def train(config: SDFTTrainerConfig):
                     )
                 student_logits = student_out["logits"]
 
-                with torch.no_grad():
-                    teacher_out = forward(
-                        active_teacher,
-                        teacher_input_ids,
-                        teacher_position_ids,
-                        cast_output_to_float=False,
-                    )
-                    teacher_logits = teacher_out["logits"]
+                if teacher_regularization == "trust-region":
+                    with torch.no_grad():
+                        teacher_out = forward(
+                            teacher_model,
+                            teacher_input_ids,
+                            teacher_position_ids,
+                            cast_output_to_float=False,
+                        )
+                        teacher_logits = torch.lerp(
+                            teacher_out["logits"],
+                            student_logits.detach(),
+                            config.ref_model.update_rate,
+                        )
+                else:
+                    with torch.no_grad():
+                        teacher_out = forward(
+                            active_teacher,
+                            teacher_input_ids,
+                            teacher_position_ids,
+                            cast_output_to_float=False,
+                        )
+                        teacher_logits = teacher_out["logits"]
 
                 student_comp_logits = _extract_completion_logits(student_logits, completion_mask)
                 teacher_comp_logits = _extract_completion_logits(teacher_logits, teacher_completion_mask)
@@ -748,7 +810,8 @@ def train(config: SDFTTrainerConfig):
                     teacher_distill_lp = teacher_comp_log_probs
 
                 is_ratio = None
-                if needs_is:
+                rollout_is_weights = None
+                if needs_old_log_probs:
                     student_token_lp = _compute_token_log_probs(student_logits, student_input_ids)
                     student_token_lp_comp = _extract_completion_values(student_token_lp, completion_mask)
                     old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
@@ -756,10 +819,19 @@ def train(config: SDFTTrainerConfig):
 
                     negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
                     negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
-                    is_ratio = torch.exp(negative_approx_kl).clamp(max=is_clip)
-
-                    batch_is_mean += (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
-                    batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
+                    if needs_distill_is:
+                        is_ratio = torch.exp(negative_approx_kl).clamp(max=distill_is_clip)
+                        batch_is_mean += (
+                            (is_ratio * aligned_mask).sum().detach() / aligned_mask.sum().clamp(min=1) / grad_accum_steps
+                        )
+                        batch_is_max = torch.max(batch_is_max, is_ratio.max().detach())
+                    if needs_rollout_is:
+                        rollout_is_weights = _compute_rollout_is_weights(
+                            log_ratio=negative_approx_kl,
+                            mask=aligned_mask,
+                            rollout_is=rollout_is,
+                            threshold=rollout_is_threshold,
+                        )
 
                 loss, metrics = sdft_kl_loss(
                     student_distill_lp,
@@ -767,6 +839,7 @@ def train(config: SDFTTrainerConfig):
                     aligned_mask,
                     alpha=config.loss.alpha,
                     is_ratio=is_ratio,
+                    rollout_is_weights=rollout_is_weights,
                 )
 
                 batch_loss += loss.detach() / grad_accum_steps
@@ -795,7 +868,7 @@ def train(config: SDFTTrainerConfig):
         scheduler.step()
 
         # EMA update after every optimizer step
-        if teacher_model is not None:
+        if teacher_model is not None and teacher_regularization == "ema":
             ema_update(teacher_model, model, config.ref_model.update_rate)
             logger.debug(f"EMA update at step {progress.step + 1} (rate={config.ref_model.update_rate})")
 
@@ -830,7 +903,7 @@ def train(config: SDFTTrainerConfig):
             "time/elapsed_hours": elapsed_h,
             "step": progress.step,
         }
-        if needs_is:
+        if needs_distill_is:
             log_dict["is/weight_mean"] = batch_is_mean.item()
             log_dict["is/weight_max"] = batch_is_max.item()
         monitor.log(log_dict, step=progress.step)

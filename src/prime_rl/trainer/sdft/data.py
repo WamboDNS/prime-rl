@@ -169,6 +169,8 @@ def prepare_sdft_batch(
     max_prompt_length: int,
     max_completion_length: int,
     max_reprompt_length: int | None = None,
+    student_systems: list[str | None] | None = None,
+    teacher_systems: list[str | None] | None = None,
 ) -> SDFTTrainBatch:
     """Tokenize dual prompts + shared completions into padded training tensors.
 
@@ -181,14 +183,29 @@ def prepare_sdft_batch(
     all_teacher_ids = []
     all_completion_lengths = []
 
+    if student_systems is None:
+        student_systems = [None] * batch_size
+    if teacher_systems is None:
+        teacher_systems = [None] * batch_size
+
     for i in range(batch_size):
+        student_messages = []
+        if student_systems[i]:
+            student_messages.append({"role": "system", "content": student_systems[i]})
+        student_messages.append({"role": "user", "content": student_prompts[i]})
+
+        teacher_messages = []
+        if teacher_systems[i]:
+            teacher_messages.append({"role": "system", "content": teacher_systems[i]})
+        teacher_messages.append({"role": "user", "content": teacher_prompts[i]})
+
         student_prompt_text = tokenizer.apply_chat_template(
-            [{"role": "user", "content": student_prompts[i]}],
+            student_messages,
             add_generation_prompt=True,
             tokenize=False,
         )
         teacher_prompt_text = tokenizer.apply_chat_template(
-            [{"role": "user", "content": teacher_prompts[i]}],
+            teacher_messages,
             add_generation_prompt=True,
             tokenize=False,
         )

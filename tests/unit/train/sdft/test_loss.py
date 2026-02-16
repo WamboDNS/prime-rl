@@ -95,6 +95,25 @@ def test_is_ratio_applied():
     torch.testing.assert_close(loss_with_is, loss_no_is * 2.0, atol=1e-5, rtol=1e-5)
 
 
+def test_rollout_is_weights_applied():
+    """Rollout-correction IS weights modify the loss."""
+    student = torch.randn(2, 10, 50, device="cuda").log_softmax(dim=-1)
+    teacher = (torch.randn(2, 10, 50, device="cuda") * 3).log_softmax(dim=-1)
+    mask = torch.ones(2, 10, dtype=torch.bool, device="cuda")
+
+    loss_no_rollout_is, _ = sdft_kl_loss(student, teacher, mask, alpha=0.5)
+    rollout_is_weights = torch.full((2, 10), 1.5, device="cuda")
+    loss_with_rollout_is, _ = sdft_kl_loss(
+        student,
+        teacher,
+        mask,
+        alpha=0.5,
+        rollout_is_weights=rollout_is_weights,
+    )
+
+    torch.testing.assert_close(loss_with_rollout_is, loss_no_rollout_is * 1.5, atol=1e-5, rtol=1e-5)
+
+
 def test_add_tail():
     """add_tail appends a valid tail probability bucket."""
     log_probs = torch.tensor([[-1.0, -2.0, -3.0]]).log_softmax(dim=-1)

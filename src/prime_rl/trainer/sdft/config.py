@@ -54,18 +54,33 @@ class SDFTLossConfig(BaseConfig):
         Field(gt=0.0, description="Clip value for IS ratio (π_current/π_old). None disables IS."),
     ] = 2.0
 
+    rollout_is: Annotated[
+        Literal["token", "sequence"] | None,
+        Field(description="Optional rollout-correction IS weights to apply in addition to distillation IS."),
+    ] = None
+
+    rollout_is_threshold: Annotated[
+        float,
+        Field(gt=0.0, description="Truncation threshold for rollout-correction IS weights."),
+    ] = 2.0
+
 
 class SDFTRefModelConfig(BaseConfig):
-    """Configures the EMA teacher model for SDFT."""
+    """Configures the teacher model for SDFT."""
 
     enabled: Annotated[
         bool,
-        Field(description="Whether to use a separate EMA reference model as teacher."),
+        Field(description="Whether to use a separate reference model as teacher."),
     ] = False
+
+    regularization: Annotated[
+        Literal["ema", "trust-region"],
+        Field(description="Teacher regularization mode."),
+    ] = "ema"
 
     update_rate: Annotated[
         float,
-        Field(gt=0.0, le=1.0, description="EMA blend: teacher = rate*student + (1-rate)*teacher."),
+        Field(ge=0.0, le=1.0, description="EMA update rate or trust-region mix coefficient."),
     ] = 0.05
 
 
@@ -272,6 +287,14 @@ class SDFTTrainerConfig(BaseSettings):
     def validate_fused_distillation(self):
         if self.loss.fused_distillation and self.loss.distillation_topk is None:
             raise ValueError("fused_distillation requires distillation_topk to be set (not None)")
+        if self.ref_model.enabled and self.ref_model.regularization == "trust-region" and self.loss.fused_distillation:
+            raise ValueError("trust-region teacher requires fused_distillation to be disabled")
+        return self
+
+    @model_validator(mode="after")
+    def validate_ref_model_config(self):
+        if self.ref_model.regularization == "trust-region" and not self.ref_model.enabled:
+            raise ValueError("trust-region teacher regularization requires ref_model.enabled=true")
         return self
 
     @model_validator(mode="after")

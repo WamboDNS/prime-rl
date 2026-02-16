@@ -31,6 +31,8 @@ full_logit_distillation = true
 distillation_topk = 20
 distillation_add_tail = true
 is_clip = 2.0
+rollout_is = "token"
+rollout_is_threshold = 2.0
 
 [trainer.ref_model]
 enabled = true

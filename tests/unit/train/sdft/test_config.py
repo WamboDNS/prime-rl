@@ -9,7 +9,9 @@ def test_valid_default_config():
     config = SDFTTrainerConfig()
     assert config.loss.alpha == 0.5
     assert config.loss.distillation_topk == 100
+    assert config.loss.rollout_is is None
     assert config.ref_model.update_rate == 0.05
+    assert config.ref_model.regularization == "ema"
     assert config.reprompt.success_threshold == 1.0
     assert config.generation.num_completions == 8
 
@@ -90,4 +92,19 @@ def test_batch_divisible_by_num_completions():
         SDFTTrainerConfig(
             data={"batch_size": 10, "micro_batch_size": 1},
             generation={"num_completions": 3},
+        )
+
+
+def test_trust_region_requires_ref_model():
+    """trust-region regularization requires an explicit reference model."""
+    with pytest.raises(ValidationError):
+        SDFTTrainerConfig(ref_model={"enabled": False, "regularization": "trust-region"})
+
+
+def test_trust_region_requires_standard_distillation():
+    """trust-region requires non-fused distillation path."""
+    with pytest.raises(ValidationError):
+        SDFTTrainerConfig(
+            ref_model={"enabled": True, "regularization": "trust-region"},
+            loss={"fused_distillation": True},
         )

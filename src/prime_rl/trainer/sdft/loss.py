@@ -27,6 +27,7 @@ def sdft_kl_loss(
     completion_mask: Tensor,
     alpha: float = 0.5,
     is_ratio: Tensor | None = None,
+    rollout_is_weights: Tensor | None = None,
 ) -> tuple[Tensor, dict[str, Tensor]]:
     """KL divergence loss between student and teacher distributions.
 
@@ -37,7 +38,8 @@ def sdft_kl_loss(
         teacher_log_probs: [batch, seq, K] log_softmax output (same token indices as student).
         completion_mask: [batch, seq] boolean mask for completion tokens.
         alpha: 0=forward KL(teacher||student), 0.5=JSD, 1=reverse KL(student||teacher).
-        is_ratio: [batch, seq] per-token importance sampling ratio, already clamped.
+        is_ratio: [batch, seq] per-token distillation importance sampling ratio, already clamped.
+        rollout_is_weights: [batch, seq] optional rollout-correction IS weights, already clamped.
     """
     if alpha == 0.0:
         kl_loss = F.kl_div(student_log_probs, teacher_log_probs, reduction="none", log_target=True)
@@ -57,6 +59,8 @@ def sdft_kl_loss(
 
     if is_ratio is not None:
         per_token_loss = per_token_loss * is_ratio
+    if rollout_is_weights is not None:
+        per_token_loss = per_token_loss * rollout_is_weights
 
     # Token-mean aggregation (matches SDPO)
     num_tokens = completion_mask.sum().clamp(min=1)

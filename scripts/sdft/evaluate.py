@@ -75,6 +75,7 @@ def main():
     parser.add_argument("--label", type=str, default=None)
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument("--concurrency", type=int, default=16, help="Max concurrent API calls")
+    parser.add_argument("--timeout-seconds", type=float, default=120.0, help="HTTP timeout per request")
     args = parser.parse_args()
 
     test_path = Path(args.test_data)
@@ -87,7 +88,7 @@ def main():
     except json.JSONDecodeError:
         data = [json.loads(line) for line in text.splitlines() if line.strip()]
 
-    client = AsyncOpenAI(base_url=args.base_url, api_key="unused", timeout=120)
+    client = AsyncOpenAI(base_url=args.base_url, api_key="unused", timeout=args.timeout_seconds)
     semaphore = asyncio.Semaphore(args.concurrency)
 
     async def eval_one(idx: int, example: dict) -> dict:

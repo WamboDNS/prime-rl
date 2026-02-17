@@ -76,6 +76,7 @@ project = "SDPO-generalization"
 [trainer.ckpt]
 interval = 30
 keep_last = 3
+save_training_state = false
 
 [trainer]
 num_epochs = 30

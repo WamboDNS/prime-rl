@@ -437,7 +437,9 @@ def setup_ckpt_managers(
 ) -> tuple[CheckpointManager | None, WeightCheckpointManager | None]:
     if ckpt_config is None:
         return None, None
-    ckpt_manager = CheckpointManager(output_dir, ckpt_config)
+    if ckpt_config.resume_step is not None and not ckpt_config.save_training_state:
+        raise ValueError("ckpt.resume_step requires ckpt.save_training_state=true")
+    ckpt_manager = CheckpointManager(output_dir, ckpt_config) if ckpt_config.save_training_state else None
     if ckpt_config.weights:
         weight_ckpt_manager = WeightCheckpointManager(
             output_dir,

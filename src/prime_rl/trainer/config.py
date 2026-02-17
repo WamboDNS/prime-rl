@@ -507,6 +507,13 @@ class CheckpointConfig(BaseConfig):
         ),
     ] = None
 
+    save_training_state: Annotated[
+        bool,
+        Field(
+            description="Whether to save trainer state (model shards, optimizer, scheduler, progress) for resuming training.",
+        ),
+    ] = True
+
     skip_progress: Annotated[
         bool,
         Field(

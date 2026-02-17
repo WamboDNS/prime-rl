@@ -513,18 +513,20 @@ def train(config: SDFTTrainerConfig):
         is_last_step = max_steps is not None and progress.step == max_steps
 
         # Checkpoint saving
-        if (
-            ckpt_manager is not None
-            and config.ckpt
+        should_save_step_ckpt = (
+            config.ckpt
             and config.ckpt.interval
             and progress.step > 0
             and not is_last_step
             and progress.step % config.ckpt.interval == 0
-        ):
-            logger.info(f"Saving checkpoint at step {progress.step}")
-            ckpt_manager.save(progress.step, model, [optimizer], scheduler, progress)
-            ckpt_manager.maybe_clean()
+        )
+        if should_save_step_ckpt:
+            if ckpt_manager is not None:
+                logger.info(f"Saving checkpoint at step {progress.step}")
+                ckpt_manager.save(progress.step, model, [optimizer], scheduler, progress)
+                ckpt_manager.maybe_clean()
             if weight_ckpt_manager is not None:
+                logger.info(f"Saving weight checkpoint at step {progress.step}")
                 weight_ckpt_manager.save(progress.step, model, tokenizer)
                 weight_ckpt_manager.maybe_clean()
 

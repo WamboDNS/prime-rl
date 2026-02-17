@@ -15,7 +15,11 @@ trainer_gpu_ids = [1, 2, 3]
 [trainer.model]
 name = "Qwen/Qwen3-8B"
 fused_lm_head_chunk_size = "disabled"
-reshard_after_forward = false
+reshard_after_forward = true
+trust_remote_code = true
+
+[trainer.tokenizer]
+trust_remote_code = true
 
 [trainer.model.ac]
 freq = 1
@@ -27,8 +31,8 @@ answer_field = "answer"
 kind_field = "kind"
 batch_size = 32
 mini_batch_size = 32
-# Use micro-batch per GPU = 2 on 80GB cards for higher throughput.
-micro_batch_size = 2
+# Use micro-batch per GPU = 1 for SDPO parity and memory safety.
+micro_batch_size = 1
 
 [trainer.loss]
 alpha = 0.5
@@ -45,6 +49,7 @@ update_rate = 0.05
 replicated = false
 
 [trainer.reprompt]
+success_threshold = 0.5
 include_feedback = false
 reprompt_truncation = "right"
 environment_feedback_only_without_solution = true
@@ -73,11 +78,15 @@ interval = 30
 keep_last = 3
 
 [trainer]
-num_epochs = 35
+num_epochs = 30
 output_dir = "outputs/sdpo-generalization"
+
+[inference]
+gpu_memory_utilization = 0.75
 
 [inference.model]
 max_model_len = 18944
+trust_remote_code = true
 
 [inference.server]
 port = 8000

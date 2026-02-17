@@ -42,7 +42,7 @@ rollout_is_threshold = 2.0
 [trainer.ref_model]
 enabled = true
 update_rate = 0.05
-replicated = true
+replicated = false
 
 [trainer.reprompt]
 include_feedback = false

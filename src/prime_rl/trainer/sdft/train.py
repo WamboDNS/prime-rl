@@ -74,12 +74,8 @@ async def generate_completions(
             )
         )
     responses = await asyncio.gather(*tasks)
-    # Flatten: each response has num_completions choices, emit in prompt-major order
-    return [
-        choice.message.content or ""
-        for r in responses
-        for choice in r.choices
-    ]
+    # Flatten: each response has num_completions choices, emit in prompt-major order.
+    return [choice.message.content or "" for response in responses for choice in response.choices]
 
 
 def _remove_thinking(text: str) -> str:
@@ -154,7 +150,12 @@ def build_teacher_prompts(
     return teacher_prompts, sd_mask
 
 
-def broadcast_weights_to_inference(model, output_dir, step, world):
+def broadcast_weights_to_inference(
+    model: torch.nn.Module,
+    output_dir,
+    step: int,
+    world,
+) -> None:
     """Save model weights to filesystem so the inference server can pick them up."""
     broadcast_dir = get_broadcast_dir(output_dir)
     state_dict = gather_weights_on_master(model, is_master=world.is_master)
@@ -168,7 +169,11 @@ def broadcast_weights_to_inference(model, output_dir, step, world):
     dist.barrier()
 
 
-def ema_update(teacher_model, student_model, update_rate):
+def ema_update(
+    teacher_model: torch.nn.Module,
+    student_model: torch.nn.Module,
+    update_rate: float,
+) -> None:
     """EMA update: teacher = rate*student + (1-rate)*teacher."""
     def local_tensor_or_self(tensor):
         if hasattr(tensor, "to_local"):
@@ -296,14 +301,6 @@ def _completion_token_mask(completion_mask: torch.Tensor) -> torch.Tensor:
     return positions < lengths.unsqueeze(1)
 
 
-def _scatter_flat_by_mask(flat: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-    """Scatter flattened valid-token tensor back to [batch, max_len, ...] padded form."""
-    out_shape = (mask.shape[0], mask.shape[1], *flat.shape[1:])
-    out = torch.zeros(out_shape, device=flat.device, dtype=flat.dtype)
-    out[mask] = flat
-    return out
-
-
 def forward_hidden(model: torch.nn.Module, input_ids: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
     """Get hidden states without computing lm_head logits.
 
@@ -319,8 +316,10 @@ def forward_hidden(model: torch.nn.Module, input_ids: torch.Tensor, position_ids
         return PrimeLmOutput()
 
     model.lm_head.forward = capture_hidden
-    model(input_ids=input_ids, position_ids=position_ids)
-    model.lm_head.forward = original_forward
+    try:
+        model(input_ids=input_ids, position_ids=position_ids)
+    finally:
+        model.lm_head.forward = original_forward
     return hidden_ref[0]
 
 
@@ -361,11 +360,11 @@ def _extract_dense_completions(
     comp_lengths = completion_mask.sum(dim=-1)
     max_comp_len = int(comp_lengths.max().item())
     if max_comp_len == 0:
-        B = hidden.shape[0]
-        dummy_shape = (B, 1) + hidden.shape[2:]
+        batch_size = hidden.shape[0]
+        dummy_shape = (batch_size, 1) + hidden.shape[2:]
         return (
             torch.zeros(dummy_shape, device=hidden.device, dtype=hidden.dtype),
-            torch.zeros(B, 1, dtype=torch.bool, device=hidden.device),
+            torch.zeros(batch_size, 1, dtype=torch.bool, device=hidden.device),
             1,
         )
     dense = hidden[:, -max_comp_len:]
@@ -396,6 +395,15 @@ def _extract_completion_values(values: torch.Tensor, completion_mask: torch.Tens
         n = comp_indices.shape[0]
         result[i, :n] = values[i, comp_indices]
     return result
+
+
+def _compute_negative_approx_kl(
+    student_token_log_probs: torch.Tensor,
+    old_token_log_probs: torch.Tensor,
+) -> torch.Tensor:
+    """Compute clamped detached log-ratio used by IS corrections."""
+    log_ratio = (student_token_log_probs - old_token_log_probs).detach()
+    return torch.clamp(log_ratio, min=-20.0, max=20.0)
 
 
 @clean_exit
@@ -537,7 +545,7 @@ def train(config: SDFTTrainerConfig):
 
             if world.is_master:
                 logger.info(f"Generating {len(prompts)}x{num_completions} completions...")
-                completions = asyncio.get_event_loop().run_until_complete(
+                completions = asyncio.run(
                     generate_completions(
                         client=client,
                         prompts=prompts,
@@ -748,12 +756,12 @@ def train(config: SDFTTrainerConfig):
                     raise RuntimeError("Student/teacher completion token masks are misaligned")
                 aligned_mask = s_valid_mask & sd_mask.unsqueeze(1).bool()
 
-                B = s_dense.shape[0]
-                H = s_dense.shape[-1]
+                batch_size = s_dense.shape[0]
+                hidden_dim = s_dense.shape[-1]
                 lm_weight = model.lm_head.weight
 
-                s_flat = s_dense.reshape(-1, H)
-                t_flat = t_dense.reshape(-1, H)
+                s_flat = s_dense.reshape(-1, hidden_dim)
+                t_flat = t_dense.reshape(-1, hidden_dim)
 
                 student_topk_lp, teacher_topk_lp, _ = fused_distill_topk(
                     s_flat, t_flat, lm_weight,
@@ -761,8 +769,8 @@ def train(config: SDFTTrainerConfig):
                     chunk_size=config.loss.distillation_chunk_size,
                 )
 
-                student_topk_lp = student_topk_lp.reshape(B, max_comp_len, -1)
-                teacher_topk_lp = teacher_topk_lp.reshape(B, max_comp_len, -1)
+                student_topk_lp = student_topk_lp.reshape(batch_size, max_comp_len, -1)
+                teacher_topk_lp = teacher_topk_lp.reshape(batch_size, max_comp_len, -1)
 
                 if config.loss.distillation_add_tail:
                     student_distill_lp = add_tail(student_topk_lp)
@@ -785,8 +793,10 @@ def train(config: SDFTTrainerConfig):
                     student_token_lp_comp = student_token_lp[:, -max_comp_len:]
                     old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")[:, -max_comp_len:]
 
-                    negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
-                    negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
+                    negative_approx_kl = _compute_negative_approx_kl(
+                        student_token_log_probs=student_token_lp_comp,
+                        old_token_log_probs=old_token_lp_comp,
+                    )
                     if needs_distill_is:
                         is_ratio = torch.exp(negative_approx_kl).clamp(max=distill_is_clip)
                         batch_is_mean += (
@@ -888,8 +898,10 @@ def train(config: SDFTTrainerConfig):
                     old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
                     old_token_lp_comp = _extract_completion_values(old_token_lp_comp, completion_mask)
 
-                    negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
-                    negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
+                    negative_approx_kl = _compute_negative_approx_kl(
+                        student_token_log_probs=student_token_lp_comp,
+                        old_token_log_probs=old_token_lp_comp,
+                    )
                     if needs_distill_is:
                         is_ratio = torch.exp(negative_approx_kl).clamp(max=distill_is_clip)
                         batch_is_mean += (

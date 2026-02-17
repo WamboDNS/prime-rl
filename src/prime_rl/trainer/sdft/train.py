@@ -61,18 +61,24 @@ async def generate_completions(
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        for _ in range(num_completions):
-            task = client.chat.completions.create(
+        tasks.append(
+            client.chat.completions.create(
                 model=model_name,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 top_p=top_p,
+                n=num_completions,
                 extra_body={"top_k": top_k},
             )
-            tasks.append(task)
+        )
     responses = await asyncio.gather(*tasks)
-    return [r.choices[0].message.content or "" for r in responses]
+    # Flatten: each response has num_completions choices, emit in prompt-major order
+    return [
+        choice.message.content or ""
+        for r in responses
+        for choice in r.choices
+    ]
 
 
 def _remove_thinking(text: str) -> str:
@@ -114,9 +120,10 @@ def build_teacher_prompts(
 
         has_solution = len(solution_idxs) > 0
         feedback = scores[i].get("feedback") if reprompt_cfg.include_feedback else None
-        has_feedback = feedback is not None
+        has_feedback = feedback is not None and isinstance(feedback, str) and bool(feedback.strip())
+        use_feedback = has_feedback and (not reprompt_cfg.environment_feedback_only_without_solution or not has_solution)
 
-        if has_solution or has_feedback:
+        if has_solution or use_feedback:
             solution_section = ""
             if has_solution:
                 solution_text = completions[solution_idxs[0]]
@@ -127,7 +134,7 @@ def build_teacher_prompts(
                 )
 
             feedback_section = ""
-            if has_feedback:
+            if use_feedback:
                 feedback_section = reprompt_cfg.feedback_template.format(
                     feedback_raw=feedback,
                 )
@@ -423,11 +430,9 @@ def train(config: SDFTTrainerConfig):
     rollout_is = config.loss.rollout_is
     rollout_is_threshold = config.loss.rollout_is_threshold
     teacher_regularization = config.ref_model.regularization
-    # IS correction is needed when the model changes between processing samples in the same generation batch:
-    # either multiple optimizer steps per batch (mini_batch_size < batch_size) or multiple iterations.
-    single_step_per_batch = (config.generation.num_iterations == 1 and mini_batch_size == config.data.batch_size)
-    needs_distill_is = distill_is_clip is not None and not single_step_per_batch
-    needs_rollout_is = rollout_is is not None and not single_step_per_batch
+    # Match SDPO behavior: if IS is configured, apply it regardless of step count per generation batch.
+    needs_distill_is = distill_is_clip is not None
+    needs_rollout_is = rollout_is is not None
     needs_old_log_probs = needs_distill_is or needs_rollout_is
 
     logger.info(f"Starting training loop (max_steps={max_steps or 'infinite'})")
@@ -570,6 +575,7 @@ def train(config: SDFTTrainerConfig):
                 max_prompt_length=config.generation.max_prompt_length,
                 max_completion_length=config.generation.max_completion_length,
                 max_reprompt_length=config.reprompt.max_reprompt_length,
+                reprompt_truncation=config.reprompt.reprompt_truncation,
                 student_systems=student_systems,
                 teacher_systems=teacher_systems,
             )

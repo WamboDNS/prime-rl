@@ -138,3 +138,19 @@ def test_system_messages_are_preserved(tokenizer):
 
     assert batch_with_system["student_input_ids"].shape[1] >= batch_no_system["student_input_ids"].shape[1]
     assert batch_with_system["teacher_input_ids"].shape[1] >= batch_no_system["teacher_input_ids"].shape[1]
+
+
+def test_teacher_reprompt_truncation_error_mode(tokenizer):
+    """reprompt_truncation='error' raises when teacher prompt exceeds max_reprompt_length."""
+    with pytest.raises(ValueError):
+        prepare_sdft_batch(
+            student_prompts=["short"],
+            teacher_prompts=["very long " * 200],
+            completions=["ok"],
+            self_distillation_mask=[True],
+            tokenizer=tokenizer,
+            max_prompt_length=128,
+            max_completion_length=32,
+            max_reprompt_length=16,
+            reprompt_truncation="error",
+        )

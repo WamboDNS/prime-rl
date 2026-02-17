@@ -42,6 +42,11 @@ rollout_is_threshold = 2.0
 enabled = true
 update_rate = 0.05
 
+[trainer.reprompt]
+include_feedback = false
+reprompt_truncation = "right"
+environment_feedback_only_without_solution = true
+
 [trainer.generation]
 num_completions = 8
 max_completion_length = 8192

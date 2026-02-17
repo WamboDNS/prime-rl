@@ -13,6 +13,8 @@ def test_valid_default_config():
     assert config.ref_model.update_rate == 0.05
     assert config.ref_model.regularization == "ema"
     assert config.reprompt.success_threshold == 1.0
+    assert config.reprompt.reprompt_truncation == "right"
+    assert config.reprompt.environment_feedback_only_without_solution is True
     assert config.generation.num_completions == 8
 
 

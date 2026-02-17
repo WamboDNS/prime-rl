@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Literal, TypedDict, cast
 
 import torch
 from datasets import Dataset, load_dataset, load_from_disk
@@ -169,6 +169,7 @@ def prepare_sdft_batch(
     max_prompt_length: int,
     max_completion_length: int,
     max_reprompt_length: int | None = None,
+    reprompt_truncation: Literal["left", "right", "error"] = "right",
     student_systems: list[str | None] | None = None,
     teacher_systems: list[str | None] | None = None,
 ) -> SDFTTrainBatch:
@@ -187,6 +188,17 @@ def prepare_sdft_batch(
         student_systems = [None] * batch_size
     if teacher_systems is None:
         teacher_systems = [None] * batch_size
+
+    def truncate_prompt_ids(ids: list[int], max_len: int, mode: Literal["left", "right", "error"]) -> list[int]:
+        if len(ids) <= max_len:
+            return ids
+        if mode == "left":
+            return ids[-max_len:]
+        if mode == "right":
+            return ids[:max_len]
+        raise ValueError(
+            f"Teacher prompt length {len(ids)} exceeds max_reprompt_length={max_len} with reprompt_truncation='error'"
+        )
 
     for i in range(batch_size):
         student_messages = []
@@ -216,7 +228,7 @@ def prepare_sdft_batch(
 
         student_prompt_ids = student_prompt_ids[-max_prompt_length:]
         if max_reprompt_length is not None:
-            teacher_prompt_ids = teacher_prompt_ids[-max_reprompt_length:]
+            teacher_prompt_ids = truncate_prompt_ids(teacher_prompt_ids, max_reprompt_length, reprompt_truncation)
         else:
             teacher_prompt_ids = teacher_prompt_ids[-max_prompt_length:]
         completion_ids = completion_ids[:max_completion_length]

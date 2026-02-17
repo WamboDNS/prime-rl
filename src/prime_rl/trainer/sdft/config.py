@@ -107,6 +107,11 @@ class SDFTRepromptConfig(BaseConfig):
         Field(ge=1, description="Max tokens for teacher prompt (before completion)."),
     ] = 10240
 
+    reprompt_truncation: Annotated[
+        Literal["left", "right", "error"],
+        Field(description="Truncation mode for teacher prompt before completion append."),
+    ] = "right"
+
     reprompt_template: Annotated[
         str,
         Field(description="Template for teacher prompt. Variables: {prompt}, {solution}, {feedback}."),
@@ -126,6 +131,11 @@ class SDFTRepromptConfig(BaseConfig):
         bool,
         Field(description="Include environment feedback in teacher prompt."),
     ] = False
+
+    environment_feedback_only_without_solution: Annotated[
+        bool,
+        Field(description="If True, only include feedback when no successful solution exists."),
+    ] = True
 
 
 class SDFTGenerationConfig(BaseConfig):

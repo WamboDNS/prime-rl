@@ -47,6 +47,8 @@ num_iterations = 1
 
 [trainer.reprompt]
 include_feedback = true
+reprompt_truncation = "right"
+environment_feedback_only_without_solution = true
 
 [trainer.optim]
 type = "adamw"

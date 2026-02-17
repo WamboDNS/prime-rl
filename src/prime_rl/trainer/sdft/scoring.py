@@ -37,14 +37,9 @@ def _extract_xml_answer(text: str) -> str | None:
 
 def _score_mcq(completion: str, answer: str) -> dict:
     """Score MCQ completion by extracting answer tag and comparing."""
-    pred = _extract_xml_answer(completion)
-    if pred is None:
-        # Fallback: look for last standalone letter A-D
-        match = re.search(r"\b([A-D])\b(?!.*\b[A-D]\b)", completion)
-        pred = match.group(1) if match else ""
-
-    score = 1.0 if pred.upper() == answer.upper() else 0.0
-    return {"score": score, "pred": pred, "feedback": None}
+    pred = _extract_xml_answer(completion) or ""
+    score = 1.0 if pred == answer else 0.0
+    return {"score": score, "pred": pred, "feedback": ""}
 
 
 def _score_tooluse(completion: str, answer: str) -> dict:

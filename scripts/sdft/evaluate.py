@@ -19,6 +19,7 @@ import asyncio
 import json
 import math
 import sys
+import time
 from pathlib import Path
 
 from openai import AsyncOpenAI
@@ -64,6 +65,13 @@ def pass_at_k(n: int, c: int, k: int) -> float:
     return 1.0 - math.comb(n - c, k) / math.comb(n, k)
 
 
+def format_duration(seconds: float) -> str:
+    seconds_int = max(0, int(seconds))
+    hours, rem = divmod(seconds_int, 3600)
+    minutes, secs = divmod(rem, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate model using scoring.py")
     parser.add_argument("--test-data", type=str, required=True, help="Path to test JSONL/JSON file")
@@ -76,6 +84,7 @@ def main():
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument("--concurrency", type=int, default=16, help="Max concurrent API calls")
     parser.add_argument("--timeout-seconds", type=float, default=120.0, help="HTTP timeout per request")
+    parser.add_argument("--progress-every", type=int, default=1, help="Print progress every N completed prompts")
     args = parser.parse_args()
 
     test_path = Path(args.test_data)
@@ -119,13 +128,26 @@ def main():
     async def run_all():
         tasks = [eval_one(i, ex) for i, ex in enumerate(data)]
         results = []
+        start_time = time.perf_counter()
+        total = len(data)
         for coro in asyncio.as_completed(tasks):
             result = await coro
             results.append(result)
             done = len(results)
-            if done % 50 == 0 or done == len(data):
+            if done % args.progress_every == 0 or done == total:
+                elapsed = time.perf_counter() - start_time
+                rate = done / elapsed if elapsed > 0 else 0.0
+                remaining = total - done
+                eta = remaining / rate if rate > 0 else 0.0
                 acc = sum(1 for r in results if r["best_score"] >= 1.0) / done
-                print(f"Progress: {done}/{len(data)} | Running accuracy: {acc:.1%}")
+                print(
+                    "Progress: "
+                    f"{done}/{total} ({100 * done / total:.1f}%) | "
+                    f"Running accuracy: {acc:.1%} | "
+                    f"Elapsed: {format_duration(elapsed)} | "
+                    f"ETA: {format_duration(eta)}",
+                    flush=True,
+                )
         return sorted(results, key=lambda r: r["idx"])
 
     samples = asyncio.run(run_all())

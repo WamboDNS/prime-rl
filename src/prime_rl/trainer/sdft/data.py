@@ -132,8 +132,18 @@ def setup_sdft_dataset(config: SDFTDataConfig, num_prompts_per_batch: int) -> SD
     logger.info(f"Loading SDFT dataset: {config.dataset_name} (split={config.dataset_split})")
 
     path = Path(config.dataset_name)
-    if path.is_dir():
+    if path.is_dir() and (path / "state.json").exists():
         dataset = cast(Dataset, load_from_disk(config.dataset_name))
+    elif path.is_dir():
+        # Directory with raw JSON/Parquet files (not HF arrow format)
+        json_files = list(path.glob("train.json")) + list(path.glob("train.jsonl"))
+        parquet_files = list(path.glob("train.parquet"))
+        if json_files:
+            dataset = cast(Dataset, load_dataset("json", data_files=str(json_files[0]), split="train"))
+        elif parquet_files:
+            dataset = cast(Dataset, load_dataset("parquet", data_files=str(parquet_files[0]), split="train"))
+        else:
+            raise FileNotFoundError(f"Directory {path} has no train.json, train.jsonl, or train.parquet files")
     elif path.exists() and path.suffix in (".json", ".jsonl"):
         dataset = cast(Dataset, load_dataset("json", data_files=str(path), split="train"))
     elif path.exists() and path.suffix == ".parquet":

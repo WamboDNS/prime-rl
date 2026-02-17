@@ -46,8 +46,8 @@ class SDFTLossConfig(BaseConfig):
 
     distillation_chunk_size: Annotated[
         int,
-        Field(ge=1, description="Vocab chunk size for fused distillation."),
-    ] = 2048
+        Field(ge=1, description="Vocab chunk size for fused distillation. Larger values reduce kernel launch overhead."),
+    ] = 16384
 
     is_clip: Annotated[
         float | None,
@@ -82,6 +82,11 @@ class SDFTRefModelConfig(BaseConfig):
         float,
         Field(ge=0.0, le=1.0, description="EMA update rate or trust-region mix coefficient."),
     ] = 0.05
+
+    replicated: Annotated[
+        bool,
+        Field(description="Load teacher replicated (no FSDP) to avoid allgather overhead during forward."),
+    ] = True
 
 
 class SDFTRepromptConfig(BaseConfig):

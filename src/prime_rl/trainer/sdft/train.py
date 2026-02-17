@@ -15,7 +15,8 @@ from openai import AsyncOpenAI
 from torchtitan.distributed.utils import clip_grad_norm_
 
 from prime_rl.trainer.ckpt import setup_ckpt_managers
-from prime_rl.trainer.model import forward, setup_model, setup_tokenizer
+from prime_rl.trainer.model import forward, get_model, setup_model, setup_tokenizer
+from prime_rl.trainer.models.layers.lm_head import inject_prime_lm_head
 from prime_rl.trainer.models.layers.lm_head import PrimeLmOutput
 from prime_rl.trainer.optim import setup_optimizer
 from prime_rl.trainer.parallel_dims import get_parallel_dims
@@ -323,6 +324,57 @@ def forward_hidden(model: torch.nn.Module, input_ids: torch.Tensor, position_ids
     return hidden_ref[0]
 
 
+def setup_replicated_teacher(config) -> torch.nn.Module:
+    """Load a teacher model replicated on each GPU (no FSDP sharding).
+
+    Eliminates NCCL allgather overhead during teacher forward passes.
+    EMA updates use per-parameter full_tensor() gather from the FSDP student,
+    which is ~one allgather per step — far cheaper than allgathering every layer
+    during each forward pass.
+    """
+    from prime_rl.trainer.model import apply_ac
+
+    world = get_world()
+    logger.info(f"Loading replicated teacher model ({config.name}) to GPU {world.local_rank}")
+    model = get_model(config, device=torch.device("cpu"))
+    inject_prime_lm_head(model, chunk_size=None)
+    # Apply AC so parameter names match the FSDP student (checkpoint_wrapper prefixes).
+    if config.ac is not None:
+        apply_ac(model, config.ac)
+    model.to(f"cuda:{world.local_rank}")
+    for param in model.parameters():
+        param.requires_grad = False
+    dist.barrier()
+    return model
+
+
+def _extract_dense_completions(
+    hidden: torch.Tensor,
+    completion_mask: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, int]:
+    """Extract completion hidden states as dense [B, max_comp_len, ...] via tail slicing.
+
+    Completions are the last N tokens of each sequence (left-padded layout from
+    prepare_sdft_batch). Returns (dense_hidden, valid_mask, max_comp_len) where
+    valid_mask is True at positions that are actual completion tokens.
+    """
+    comp_lengths = completion_mask.sum(dim=-1)
+    max_comp_len = int(comp_lengths.max().item())
+    if max_comp_len == 0:
+        B = hidden.shape[0]
+        dummy_shape = (B, 1) + hidden.shape[2:]
+        return (
+            torch.zeros(dummy_shape, device=hidden.device, dtype=hidden.dtype),
+            torch.zeros(B, 1, dtype=torch.bool, device=hidden.device),
+            1,
+        )
+    dense = hidden[:, -max_comp_len:]
+    # valid_mask: right-aligned True for each sample's actual completion tokens
+    positions = torch.arange(max_comp_len, device=hidden.device).unsqueeze(0)
+    valid_mask = positions >= (max_comp_len - comp_lengths.unsqueeze(1))
+    return dense, valid_mask, max_comp_len
+
+
 def _extract_completion_values(values: torch.Tensor, completion_mask: torch.Tensor) -> torch.Tensor:
     """Extract per-token values at completion positions into a dense tensor.
 
@@ -390,10 +442,14 @@ def train(config: SDFTTrainerConfig):
     # Teacher model
     teacher_model = None
     if config.ref_model.enabled:
-        logger.info(f"Initializing reference teacher model ({config.ref_model.regularization})")
-        teacher_model = setup_model(config.model, parallel_dims, loading_from_ckpt_later)
-        for param in teacher_model.parameters():
-            param.requires_grad = False
+        if config.ref_model.replicated:
+            logger.info(f"Initializing replicated teacher model ({config.ref_model.regularization})")
+            teacher_model = setup_replicated_teacher(config.model)
+        else:
+            logger.info(f"Initializing FSDP-sharded teacher model ({config.ref_model.regularization})")
+            teacher_model = setup_model(config.model, parallel_dims, loading_from_ckpt_later)
+            for param in teacher_model.parameters():
+                param.requires_grad = False
 
     logger.info(f"Initializing optimizer ({config.optim})")
     optimizer = setup_optimizer(config.optim, list(model.named_parameters()), parallel_dims)
@@ -674,13 +730,6 @@ def train(config: SDFTTrainerConfig):
             if teacher_regularization == "trust-region" and teacher_model is None:
                 raise RuntimeError("trust-region teacher requires a separate reference model")
             sd_mask = micro_batch["self_distillation_mask"].to("cuda")
-            student_comp_token_mask = _completion_token_mask(completion_mask)
-            teacher_comp_token_mask = _completion_token_mask(teacher_completion_mask)
-
-            if not torch.equal(student_comp_token_mask, teacher_comp_token_mask):
-                raise RuntimeError("Student/teacher completion token masks are misaligned")
-
-            aligned_mask = student_comp_token_mask & sd_mask.unsqueeze(1).bool()
 
             if config.loss.fused_distillation:
                 if teacher_regularization == "trust-region":
@@ -691,9 +740,20 @@ def train(config: SDFTTrainerConfig):
                 with torch.no_grad():
                     teacher_hidden = forward_hidden(active_teacher, teacher_input_ids, teacher_position_ids)
 
-                s_flat = student_hidden[completion_mask]
-                t_flat = teacher_hidden[teacher_completion_mask]
+                # Dense completion extraction via tail slicing (no boolean indexing / nonzero syncs).
+                s_dense, s_valid_mask, max_comp_len = _extract_dense_completions(student_hidden, completion_mask)
+                t_dense, t_valid_mask, _ = _extract_dense_completions(teacher_hidden, teacher_completion_mask)
+
+                if not torch.equal(s_valid_mask, t_valid_mask):
+                    raise RuntimeError("Student/teacher completion token masks are misaligned")
+                aligned_mask = s_valid_mask & sd_mask.unsqueeze(1).bool()
+
+                B = s_dense.shape[0]
+                H = s_dense.shape[-1]
                 lm_weight = model.lm_head.weight
+
+                s_flat = s_dense.reshape(-1, H)
+                t_flat = t_dense.reshape(-1, H)
 
                 student_topk_lp, teacher_topk_lp, _ = fused_distill_topk(
                     s_flat, t_flat, lm_weight,
@@ -701,8 +761,8 @@ def train(config: SDFTTrainerConfig):
                     chunk_size=config.loss.distillation_chunk_size,
                 )
 
-                student_topk_lp = _scatter_flat_by_mask(student_topk_lp, student_comp_token_mask)
-                teacher_topk_lp = _scatter_flat_by_mask(teacher_topk_lp, student_comp_token_mask)
+                student_topk_lp = student_topk_lp.reshape(B, max_comp_len, -1)
+                teacher_topk_lp = teacher_topk_lp.reshape(B, max_comp_len, -1)
 
                 if config.loss.distillation_add_tail:
                     student_distill_lp = add_tail(student_topk_lp)
@@ -711,7 +771,7 @@ def train(config: SDFTTrainerConfig):
                     student_distill_lp = renorm_topk_log_probs(student_topk_lp)
                     teacher_distill_lp = renorm_topk_log_probs(teacher_topk_lp)
 
-                # IS correction from hidden states to avoid [B,S,V] logits materialization.
+                # IS correction via tail slicing (no boolean indexing).
                 is_ratio = None
                 rollout_is_weights = None
                 if needs_old_log_probs:
@@ -722,9 +782,8 @@ def train(config: SDFTTrainerConfig):
                             lm_weight=lm_weight,
                             chunk_size=config.loss.distillation_chunk_size,
                         )
-                    student_token_lp_comp = _scatter_flat_by_mask(student_token_lp[completion_mask], student_comp_token_mask)
-                    old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")
-                    old_token_lp_comp = _scatter_flat_by_mask(old_token_lp_comp[completion_mask], student_comp_token_mask)
+                    student_token_lp_comp = student_token_lp[:, -max_comp_len:]
+                    old_token_lp_comp = micro_batch["old_token_log_probs"].to("cuda")[:, -max_comp_len:]
 
                     negative_approx_kl = (student_token_lp_comp - old_token_lp_comp).detach()
                     negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
@@ -761,6 +820,12 @@ def train(config: SDFTTrainerConfig):
 
             else:
                 # Standard path: full [N, V] logit tensors
+                student_comp_token_mask = _completion_token_mask(completion_mask)
+                teacher_comp_token_mask = _completion_token_mask(teacher_completion_mask)
+                if not torch.equal(student_comp_token_mask, teacher_comp_token_mask):
+                    raise RuntimeError("Student/teacher completion token masks are misaligned")
+                aligned_mask = student_comp_token_mask & sd_mask.unsqueeze(1).bool()
+
                 with maybe_activation_offloading(config.model.ac_offloading):
                     student_out = forward(
                         model,

@@ -15,6 +15,7 @@ trainer_gpu_ids = [1, 2, 3]
 [trainer.model]
 name = "Qwen/Qwen3-8B"
 fused_lm_head_chunk_size = "disabled"
+reshard_after_forward = false
 
 [trainer.model.ac]
 freq = 1
@@ -41,6 +42,7 @@ rollout_is_threshold = 2.0
 [trainer.ref_model]
 enabled = true
 update_rate = 0.05
+replicated = true
 
 [trainer.reprompt]
 include_feedback = false

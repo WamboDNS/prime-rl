@@ -35,6 +35,7 @@ async def generate_completions(
     model: str,
     max_tokens: int,
     temperature: float,
+    top_p: float,
     num_completions: int,
 ) -> list[str]:
     messages = []
@@ -48,6 +49,7 @@ async def generate_completions(
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
+            top_p=top_p,
         )
         for _ in range(num_completions)
     ]
@@ -80,6 +82,7 @@ def main():
     parser.add_argument("--num-completions", type=int, default=1, help="Completions per prompt")
     parser.add_argument("--max-tokens", type=int, default=2048)
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--top-p", type=float, default=1.0, help="Top-p sampling for generation")
     parser.add_argument("--label", type=str, default=None)
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument("--concurrency", type=int, default=16, help="Max concurrent API calls")
@@ -109,7 +112,7 @@ def main():
         async with semaphore:
             completions = await generate_completions(
                 client, prompt, system, args.model,
-                args.max_tokens, args.temperature, args.num_completions,
+                args.max_tokens, args.temperature, args.top_p, args.num_completions,
             )
 
         scores = [score_completion(c, answer, kind) for c in completions]
@@ -180,6 +183,7 @@ def main():
         "dataset": dataset_name,
         "num_completions": n,
         "temperature": args.temperature,
+        "top_p": args.top_p,
         "metrics": metrics,
         "samples": samples,
     }

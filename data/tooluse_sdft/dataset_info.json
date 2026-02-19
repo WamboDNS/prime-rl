@@ -1,0 +1,42 @@
+{
+  "builder_name": "json",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "json",
+  "dataset_size": 21464619,
+  "description": "",
+  "download_checksums": {
+    "/root/prime-rl/../Self-Distillation/data/tooluse_data/train_data.json": {
+      "num_bytes": 22756209,
+      "checksum": null
+    }
+  },
+  "download_size": 22756209,
+  "features": {
+    "prompt": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "teacher_prompt": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 44220828,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 21464619,
+      "num_examples": 4046,
+      "dataset_name": "json"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

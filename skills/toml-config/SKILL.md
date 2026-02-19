@@ -79,6 +79,7 @@ All accept `@ config.toml` and CLI overrides:
 | `uv run orchestrator` | orchestrator config | Rollout orchestrator |
 | `uv run env-server` | env server config | Environment server |
 | `uv run sft` | SFT config | Supervised fine-tuning |
+| `uv run sdft` | `SDFTTrainerConfig` | Self-distillation fine-tuning (SDPO) |
 
 ## Key files
 

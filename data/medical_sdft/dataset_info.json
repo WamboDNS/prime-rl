@@ -1,0 +1,42 @@
+{
+  "builder_name": "json",
+  "citation": "",
+  "config_name": "en",
+  "dataset_name": "medical-o1-reasoning-sft",
+  "dataset_size": 56423168,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/FreedomIntelligence/medical-o1-reasoning-SFT@fc2c9e8a37b38f38da6d449564a8c350b244aef4/medical_o1_sft.json": {
+      "num_bytes": 58177051,
+      "checksum": null
+    }
+  },
+  "download_size": 58177051,
+  "features": {
+    "prompt": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "teacher_prompt": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 114600219,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 56423168,
+      "num_examples": 19704,
+      "dataset_name": "medical-o1-reasoning-sft"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

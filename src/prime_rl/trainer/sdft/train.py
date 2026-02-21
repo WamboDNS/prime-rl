@@ -471,6 +471,7 @@ async def run_eval(
                 messages=messages,
                 max_tokens=eval_config.max_tokens,
                 temperature=max(eval_config.temperature, 0.01),
+                top_p=eval_config.top_p,
             )
             for _ in range(n)
         ]

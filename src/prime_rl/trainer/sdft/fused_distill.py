@@ -24,6 +24,11 @@ def _online_logsumexp(m: Tensor, s: Tensor, chunk_logits: Tensor) -> tuple[Tenso
     return m_new, s_new
 
 
+def _chunk_logits(hidden: Tensor, weight_chunk: Tensor) -> Tensor:
+    """Compute logits for a vocab chunk, handling dtype mismatch between hidden and weight."""
+    return (hidden @ weight_chunk.to(hidden.dtype).t()).float()
+
+
 @torch.no_grad()
 def chunked_teacher_topk(
     hidden: Tensor,
@@ -57,7 +62,7 @@ def chunked_teacher_topk(
 
     for start in range(0, vocab, chunk_size):
         end = min(start + chunk_size, vocab)
-        logits = (hidden @ weight[start:end].t()).float()  # [N, C]
+        logits = _chunk_logits(hidden, weight[start:end])
 
         m, s = _online_logsumexp(m, s, logits)
 
@@ -107,7 +112,7 @@ class _ChunkedStudentGatherFn(torch.autograd.Function):
 
         for start in range(0, vocab, chunk_size):
             end = min(start + chunk_size, vocab)
-            logits = (hidden @ weight[start:end].t()).float()  # [N, C]
+            logits = _chunk_logits(hidden, weight[start:end])
 
             m, s = _online_logsumexp(m, s, logits)
 
@@ -145,7 +150,7 @@ class _ChunkedStudentGatherFn(torch.autograd.Function):
         for start in range(0, vocab, chunk_size):
             end = min(start + chunk_size, vocab)
             w_chunk = weight[start:end]
-            logits = (hidden @ w_chunk.t()).float()  # [N, C]
+            logits = _chunk_logits(hidden, w_chunk)
 
             p = torch.exp(logits - logZ.unsqueeze(-1))  # [N, C] softmax chunk
 
@@ -159,8 +164,8 @@ class _ChunkedStudentGatherFn(torch.autograd.Function):
                 grad_at_pos = torch.where(in_chunk, g, torch.zeros_like(g))
                 grad_logits.scatter_add_(-1, local_idx, grad_at_pos)
 
-            grad_hidden.add_(grad_logits.to(hidden.dtype) @ w_chunk)
-            grad_w_chunk = grad_logits.to(weight.dtype).t() @ hidden
+            grad_hidden.add_(grad_logits.to(hidden.dtype) @ w_chunk.to(hidden.dtype))
+            grad_w_chunk = grad_logits.to(weight.dtype).t() @ hidden.to(weight.dtype)
             grad_weight[start:end].add_(grad_w_chunk)
 
         return grad_hidden, grad_weight, None, None
@@ -220,7 +225,7 @@ def chunked_token_log_probs_from_hidden(
 
     for start in range(0, vocab, chunk_size):
         end = min(start + chunk_size, vocab)
-        logits = (hidden @ weight[start:end].t()).float()  # [N, C]
+        logits = _chunk_logits(hidden, weight[start:end])
         m, s = _online_logsumexp(m, s, logits)
 
         mask = (next_token_ids >= start) & (next_token_ids < end)

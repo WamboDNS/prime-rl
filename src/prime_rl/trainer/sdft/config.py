@@ -279,6 +279,11 @@ class SDFTEvalConfig(BaseConfig):
         Field(ge=0.0, description="Sampling temperature for eval. Use >0 with num_completions>1 for pass@k diversity."),
     ] = 1.0
 
+    top_p: Annotated[
+        float,
+        Field(gt=0.0, le=1.0, description="Top-p (nucleus) sampling for eval completions."),
+    ] = 1.0
+
 
 class SDFTTrainerConfig(BaseSettings):
     """Configures the SDFT trainer."""

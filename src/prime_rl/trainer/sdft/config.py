@@ -217,6 +217,11 @@ class SDFTDataConfig(BaseConfig):
         Field(description="Field name for task type (mcq, tooluse, code). Used by scoring. None to auto-detect."),
     ] = "kind"
 
+    environment_file: Annotated[
+        str | None,
+        Field(description="Path to a text file with environment context (e.g. guidelines). Prepended to system during generation, omitted during training so the student must internalize the knowledge."),
+    ] = None
+
     shuffle: Annotated[
         bool,
         Field(description="Whether to shuffle the dataset at the beginning of each epoch."),
@@ -237,6 +242,44 @@ class SDFTDataConfig(BaseConfig):
 FakeSDFTDataConfig: TypeAlias = SDFTDataConfig
 
 
+class SDFTEvalConfig(BaseConfig):
+    """Configures periodic evaluation during SDFT training (SDPO-style).
+
+    Generates num_completions per prompt and computes bootstrap best@N
+    and maj@N for N in [2, 4, 8, ..., num_completions].
+    """
+
+    enabled: Annotated[
+        bool,
+        Field(description="Whether to run evaluation during training."),
+    ] = False
+
+    interval: Annotated[
+        int,
+        Field(ge=1, description="Run evaluation every N optimizer steps."),
+    ] = 5
+
+    dataset_path: Annotated[
+        str,
+        Field(description="Path to evaluation dataset (JSON/JSONL)."),
+    ] = ""
+
+    num_completions: Annotated[
+        int,
+        Field(ge=1, description="Completions per eval prompt. Bootstrap metrics computed for N in [2,4,...,num_completions]."),
+    ] = 16
+
+    max_tokens: Annotated[
+        int,
+        Field(ge=1, description="Max tokens per eval completion."),
+    ] = 1024
+
+    temperature: Annotated[
+        float,
+        Field(ge=0.0, description="Sampling temperature for eval. Use >0 with num_completions>1 for pass@k diversity."),
+    ] = 1.0
+
+
 class SDFTTrainerConfig(BaseSettings):
     """Configures the SDFT trainer."""
 
@@ -247,6 +290,7 @@ class SDFTTrainerConfig(BaseSettings):
     reprompt: SDFTRepromptConfig = SDFTRepromptConfig()
     generation: SDFTGenerationConfig = SDFTGenerationConfig()
     data: SDFTDataConfig = SDFTDataConfig()
+    eval: SDFTEvalConfig = SDFTEvalConfig()
     client: ClientConfig = ClientConfig()
 
     optim: Annotated[OptimizerConfigType, Field(discriminator="type")] = AdamWConfig()

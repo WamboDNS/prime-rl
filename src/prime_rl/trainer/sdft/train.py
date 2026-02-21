@@ -1,4 +1,6 @@
 import asyncio
+import json
+import math
 import os
 import pickle
 import re
@@ -6,6 +8,7 @@ import shutil
 import time
 from collections import defaultdict
 from datetime import timedelta
+from pathlib import Path
 
 import torch
 import torch.distributed as dist
@@ -22,7 +25,7 @@ from prime_rl.trainer.optim import setup_optimizer
 from prime_rl.trainer.parallel_dims import get_parallel_dims
 from prime_rl.trainer.runs import Progress
 from prime_rl.trainer.scheduler import setup_scheduler
-from prime_rl.trainer.sdft.config import SDFTRepromptConfig, SDFTTrainerConfig
+from prime_rl.trainer.sdft.config import SDFTEvalConfig, SDFTRepromptConfig, SDFTTrainerConfig
 from prime_rl.trainer.sdft.data import (
     prepare_sdft_batch,
     setup_sdft_dataset,
@@ -406,6 +409,118 @@ def _compute_negative_approx_kl(
     return torch.clamp(log_ratio, min=-20.0, max=20.0)
 
 
+def _pass_at_k(n: int, c: int, k: int) -> float:
+    """Unbiased estimator of pass@k (Chen et al. 2021).
+
+    n: total completions, c: number correct, k: desired pass@k.
+    Returns: P(at least one correct in k draws from n without replacement).
+    """
+    if n - c < k:
+        return 1.0
+    return 1.0 - math.comb(n - c, k) / math.comb(n, k)
+
+
+async def run_eval(
+    client: AsyncOpenAI,
+    eval_config: SDFTEvalConfig,
+    model_name: str,
+    step: int,
+    output_dir: Path,
+) -> dict:
+    """Run evaluation on the validation set.
+
+    Generates num_completions (n) per prompt, scores each, then computes:
+    - avg@n: mean score across all completions
+    - pass@k for k in [1, 2, 4, 8, ..., n]: unbiased pass@k estimator
+    """
+    eval_path = Path(eval_config.dataset_path)
+    with open(eval_path) as f:
+        text = f.read()
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            data = [data]
+    except json.JSONDecodeError:
+        data = [json.loads(line) for line in text.splitlines() if line.strip()]
+
+    n = eval_config.num_completions
+
+    # pass@k values: 1, 2, 4, 8, ... up to n
+    ks = [1]
+    k = 2
+    while k <= n:
+        ks.append(k)
+        k *= 2
+    if ks[-1] != n:
+        ks.append(n)
+
+    async def eval_one(example: dict) -> dict:
+        prompt = example["prompt"]
+        answer = example["answer"]
+        kind = example.get("kind")
+        system = example.get("system")
+
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        tasks = [
+            client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=eval_config.max_tokens,
+                temperature=max(eval_config.temperature, 0.01),
+            )
+            for _ in range(n)
+        ]
+        responses = await asyncio.gather(*tasks)
+        completions_list = [r.choices[0].message.content or "" for r in responses]
+
+        score_results = [score_completion(c, answer, kind) for c in completions_list]
+        score_vals = [s["score"] for s in score_results]
+        pred_vals = [s["pred"] for s in score_results]
+        c = sum(1 for s in score_vals if s >= 1.0)
+
+        sample_pass_at_k = {f"pass@{k}": _pass_at_k(n, c, k) for k in ks}
+
+        return {
+            "prompt": prompt[:300],
+            "answer": answer,
+            "kind": kind,
+            "completions": [c[:500] for c in completions_list],
+            "scores": score_vals,
+            "preds": pred_vals,
+            "correct": c,
+            "pass_at_k": sample_pass_at_k,
+        }
+
+    samples = await asyncio.gather(*[eval_one(ex) for ex in data])
+
+    num_samples = len(samples)
+    agg_metrics: dict[str, float] = {
+        f"avg@{n}": round(sum(s for sample in samples for s in sample["scores"]) / (num_samples * n), 4),
+    }
+    for k in ks:
+        key = f"pass@{k}"
+        agg_metrics[key] = round(sum(s["pass_at_k"][key] for s in samples) / num_samples, 4)
+
+    agg_metrics["total"] = num_samples
+
+    result = {
+        "step": step,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "metrics": agg_metrics,
+        "samples": samples,
+    }
+
+    eval_dir = output_dir / "eval"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    (eval_dir / f"step_{step}.json").write_text(json.dumps(result, indent=2))
+
+    return result
+
+
 @clean_exit
 @logger.catch(reraise=True)
 def train(config: SDFTTrainerConfig):
@@ -488,6 +603,16 @@ def train(config: SDFTTrainerConfig):
     base_url = config.client.base_url[0]
     client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=config.client.timeout)
 
+    # Load environment context (prepended to system during generation, omitted during training)
+    environment_text = None
+    if config.data.environment_file:
+        env_path = Path(config.data.environment_file)
+        if env_path.exists():
+            environment_text = env_path.read_text().strip()
+            logger.info(f"Loaded environment context from {env_path} ({len(environment_text)} chars)")
+        else:
+            raise FileNotFoundError(f"Environment file not found: {env_path}")
+
     # Loss config shortcuts
     distillation_topk = config.loss.distillation_topk if config.loss.full_logit_distillation else None
     distill_is_clip = config.loss.is_clip
@@ -504,6 +629,27 @@ def train(config: SDFTTrainerConfig):
     train_start_time = time.perf_counter()
     snapshot_hours = sorted(config.snapshot_hours)
     next_snapshot_idx = 0
+
+    # Baseline eval at step 0 (before any training)
+    if config.eval.enabled and config.eval.dataset_path:
+        logger.info("Running baseline evaluation (step 0)...")
+        if world.is_master:
+            eval_result = asyncio.run(
+                run_eval(
+                    client=client,
+                    eval_config=config.eval,
+                    model_name=config.model.name,
+                    step=0,
+                    output_dir=config.output_dir,
+                )
+            )
+            eval_metrics = {f"eval/{k}": v for k, v in eval_result["metrics"].items()}
+            monitor.log(eval_metrics, step=0)
+            logger.success(
+                f"Baseline eval: accuracy={eval_result['metrics']['accuracy']:.2%}, "
+                f"avg_score={eval_result['metrics']['avg_score']:.4f}"
+            )
+        dist.barrier()
 
     buffer = []
     buffer_idx = 0
@@ -546,12 +692,21 @@ def train(config: SDFTTrainerConfig):
             num_completions = config.generation.num_completions
 
             if world.is_master:
+                # Merge environment context into system messages for generation only.
+                # The student trains without environment so it must internalize the knowledge.
+                gen_systems = systems
+                if environment_text:
+                    gen_systems = [
+                        f"{environment_text}\n\n{s}" if s else environment_text
+                        for s in systems
+                    ]
+
                 logger.info(f"Generating {len(prompts)}x{num_completions} completions...")
                 completions = asyncio.run(
                     generate_completions(
                         client=client,
                         prompts=prompts,
-                        system_messages=systems,
+                        system_messages=gen_systems,
                         model_name=config.model.name,
                         max_tokens=config.generation.max_completion_length,
                         temperature=config.generation.temperature,
@@ -1005,6 +1160,38 @@ def train(config: SDFTTrainerConfig):
             next_snapshot_idx += 1
 
         progress.step += 1
+
+        # Periodic evaluation
+        if (
+            config.eval.enabled
+            and config.eval.dataset_path
+            and progress.step % config.eval.interval == 0
+        ):
+            logger.info(f"Running evaluation at step {progress.step}...")
+            broadcast_weights_to_inference(model, config.output_dir, progress.step, world)
+            time.sleep(5)
+
+            if world.is_master:
+                eval_result = asyncio.run(
+                    run_eval(
+                        client=client,
+                        eval_config=config.eval,
+                        model_name=config.model.name,
+                        step=progress.step,
+                        output_dir=config.output_dir,
+                    )
+                )
+                eval_metrics = {
+                    f"eval/{k}": v
+                    for k, v in eval_result["metrics"].items()
+                }
+                monitor.log(eval_metrics, step=progress.step)
+                logger.success(
+                    f"Eval step {progress.step}: "
+                    f"accuracy={eval_result['metrics']['accuracy']:.2%}, "
+                    f"avg_score={eval_result['metrics']['avg_score']:.4f}"
+                )
+            dist.barrier()
 
     # Final checkpoint
     if ckpt_manager is not None:

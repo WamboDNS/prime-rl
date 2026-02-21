@@ -1,0 +1,1226 @@
+[
+  {
+    "prompt": "Where can C2 data be stored geographically?\n\nA) No restrictions\nB) Region Alpha only\nC) Region Alpha and Region Beta\nD) Any approved region worldwide\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which network segment is air-gapped with no internet connectivity?\n\nA) RED\nB) BLUE\nC) All segments above GREEN\nD) AMBER\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum VLAN size according to the NCF?\n\nA) 100 hosts\nB) 150 hosts\nC) 500 hosts\nD) 250 hosts\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum HMAC standard for message authentication?\n\nA) HMAC-BLAKE3\nB) HMAC-SHA-384\nC) HMAC-SHA-256\nD) HMAC-SHA-512\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within what timeframe must employees exceeding phishing click threshold complete remedial training?\n\nA) 24 hours\nB) 3 days\nC) 1 week\nD) 2 weeks\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How many professional references are required during hiring?\n\nA) 3\nB) 1\nC) 4\nD) 2\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the VPN re-keying interval?\n\nA) 120 minutes\nB) 30 minutes\nC) 90 minutes\nD) 60 minutes\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many minutes must a communication bridge be established for SEV-1?\n\nA) 15 minutes\nB) 5 minutes\nC) 30 minutes\nD) 10 minutes\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the name of the approved enterprise app store?\n\nA) Nexus Apps\nB) Nexus Market\nC) Nexus Store\nD) Nexus AppVault\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many hours must all corporate devices be returned after departure?\n\nA) 24 hours\nB) 48 hours\nC) 12 hours\nD) 4 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum password length for administrator accounts?\n\nA) 22 characters\nB) 18 characters\nC) 24 characters\nD) 16 characters\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Where are visitor accesses logged?\n\nA) Nexus Security Log\nB) Security Operations Dashboard\nC) Nexus Access Ledger\nD) Nexus Visitor Registry\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What encryption algorithm is specified for mobile devices?\n\nA) Twofish-256\nB) ChaCha20-Poly1305\nC) AES-256-GCM\nD) AES-128-GCM\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What full disk encryption is required on macOS?\n\nA) LUKS\nB) BitLocker\nC) VeraCrypt\nD) FileVault\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is Zone A designated for?\n\nA) Server rooms\nB) Reception and visitor lobby\nC) General office space\nD) Executive offices\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the patching SLA for critical vulnerabilities?\n\nA) 48 hours\nB) 4 hours\nC) 12 hours\nD) 24 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the EDR agent check-in interval?\n\nA) 10 minutes\nB) 15 minutes\nC) 5 minutes\nD) 1 minute\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How long are cloud access logs retained?\n\nA) 6 months\nB) 5 years\nC) 1 year\nD) 2 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "At which data classification level does MFA become mandatory?\n\nA) C1 and above\nB) C3 and above\nC) C2 and above\nD) All levels\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many hours must an account be deprovisioned after employee termination?\n\nA) 1 hour\nB) 8 hours\nC) 24 hours\nD) 4 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum UPS runtime for server rooms?\n\nA) 15 minutes\nB) 30 minutes\nC) 10 minutes\nD) 60 minutes\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Until what date is TLS 1.2 permitted for legacy integrations?\n\nA) June 2026\nB) June 2025\nC) December 2025\nD) March 2026\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum lifetime for server certificates?\n\nA) 365 days\nB) 90 days\nC) 730 days\nD) 398 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What wireless security standard is required for corporate access?\n\nA) WPA3-Enterprise\nB) WPA2-Personal\nC) WPA2-Enterprise\nD) WPA3-Personal\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What TLS version is required for C3 data in transit?\n\nA) TLS 1.2 or above\nB) TLS 1.1 or above\nC) TLS 1.0 or above\nD) TLS 1.3 mandatory\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Who is the CISO of Nexus Systems Corporation?\n\nA) Dr. Elara Vasquez\nB) Dr. James Rodriguez\nC) Dr. Marcus Chen\nD) Dr. Sarah Mitchell\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are penetration tests conducted on BLUE and GREEN segments?\n\nA) Monthly\nB) Quarterly\nC) Semi-annually\nD) Annually\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which regions are included in 'Region Alpha'?\n\nA) US-East-1 and US-West-2\nB) US-East-1 and EU-West-1\nC) US-East-1 only\nD) EU-West-1 and AP-Southeast-1\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How frequently are privileged access reviews conducted?\n\nA) Annually\nB) Semi-annually\nC) Quarterly\nD) Monthly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Who can authorize emergency out-of-band patches?\n\nA) Security Operations Lead\nB) CTO\nC) Any team lead\nD) CISO\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often is the incident commander rotated during active SEV-1/SEV-2 incidents?\n\nA) Every 4 hours\nB) Every 8 hours\nC) Every 6 hours\nD) Every 12 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum memory parameter for Argon2id password hashing?\n\nA) 256 MB\nB) 64 MB\nC) 32 MB\nD) 128 MB\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How many surprise compliance checks must occur per year?\n\nA) 1\nB) 4\nC) 2\nD) 6\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many hours must forensic imaging be completed after SEV-1 detection?\n\nA) 1 hour\nB) 4 hours\nC) 2 hours\nD) 8 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Starting at which classification level must all access be logged?\n\nA) C2 and above\nB) All levels\nC) C1 and above\nD) C3 and above\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What happens when a service account exceeds the failed login threshold?\n\nA) Account is locked for 30 minutes\nB) Account is disabled permanently\nC) Account is locked for 4 hours\nD) Alert is sent to SOC immediately\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Is printing C2+ documents at home permitted?\n\nA) Yes, with manager approval\nB) Only for C2 level\nC) No, prohibited\nD) Yes, with encryption\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the initial response time requirement for SEV-1 incidents?\n\nA) 15 minutes\nB) 30 minutes\nC) 5 minutes\nD) 10 minutes\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What minimum seismic rating is required for data centers?\n\nA) Zone 3\nB) Zone 1\nC) Zone 4\nD) Zone 2\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "When did the current version of the NCF become effective?\n\nA) July 1, 2024\nB) January 1, 2024\nC) October 1, 2024\nD) March 15, 2024\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What secrets management tool does Nexus use?\n\nA) Nexus Vault\nB) Azure Key Vault\nC) CyberArk\nD) AWS Secrets Manager\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must the acceptable use agreement be signed?\n\nA) Once at hiring\nB) Annually\nC) Every 2 years\nD) Every policy revision\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the internal codename for Microsoft Azure?\n\nA) Stratos\nB) Cumulus\nC) Cirrus\nD) Nimbus\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What temperature range must be maintained in server rooms?\n\nA) 18-24 degrees Celsius\nB) 15-20 degrees Celsius\nC) 20-26 degrees Celsius\nD) 16-22 degrees Celsius\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which MFA method is explicitly prohibited by the NCF?\n\nA) SMS-based MFA\nB) Biometric authentication\nC) Hardware tokens\nD) TOTP authenticator apps\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum lifetime for code signing certificates?\n\nA) 730 days\nB) 365 days\nC) 1095 days\nD) 398 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What destruction method is required for C2 data?\n\nA) Overwrite three times\nB) Standard deletion\nC) Physical destruction\nD) Cryptographic erasure\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum lifetime for client certificates?\n\nA) 398 days\nB) 180 days\nC) 365 days\nD) 90 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What authentication standard is required on all wired ports?\n\nA) Kerberos\nB) RADIUS\nC) TACACS+\nD) IEEE 802.1X\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How frequently is the IDS signature database updated?\n\nA) Every hour\nB) Every 8 hours\nC) Daily\nD) Every 4 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the NRQM risk appetite threshold?\n\nA) Below 4.0\nB) Below 3.5\nC) Below 2.5\nD) Below 3.0\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the lockout duration for contractor accounts?\n\nA) 1 hour\nB) 4 hours\nC) 30 minutes\nD) 2 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum password length for service accounts?\n\nA) 24 characters\nB) 28 characters\nC) 32 characters\nD) 22 characters\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are GREEN segment firewall rules reviewed?\n\nA) Monthly\nB) Annually\nC) Semi-annually\nD) Quarterly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are internal security audits conducted?\n\nA) Every 18 months\nB) Quarterly\nC) Every 6 months\nD) Annually\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many business days must lessons learned be distributed?\n\nA) 3 days\nB) 10 days\nC) 2 days\nD) 5 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are penetration tests conducted on the AMBER segment?\n\nA) Monthly\nB) Annually\nC) Quarterly\nD) Semi-annually\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How many security champions are designated per team?\n\nA) 1\nB) Varies by team size\nC) 2\nD) 3\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How long is the post-departure monitoring period for privileged account holders?\n\nA) 90 days\nB) 180 days\nC) 60 days\nD) 30 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How long is CCTV footage retained for Zone C and Zone D?\n\nA) 60 days\nB) 30 days\nC) 180 days\nD) 90 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What happens on a first policy violation?\n\nA) Mandatory training\nB) Verbal warning\nC) Written warning\nD) Suspension\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What happens if a jailbroken or rooted device is detected?\n\nA) User receives a warning\nB) Device is wiped remotely\nC) Device is automatically blocked\nD) Nothing, user is notified\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "In which type of workspace is the clean desk policy mandatory?\n\nA) Only Zone C and D\nB) C2 and above workspaces\nC) All workspaces\nD) C3 and above workspaces\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Until when is SHA-256 permitted under the grandfather clause?\n\nA) June 2025\nB) December 2025\nC) March 2026\nD) March 2025\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many days must critical audit findings be remediated?\n\nA) 7 days\nB) 45 days\nC) 30 days\nD) 15 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which firm conducts the annual external audit?\n\nA) Sentinel Cyber Assurance\nB) Meridian Assurance Partners\nC) Deloitte Cyber\nD) KPMG Security\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "After how many failed login attempts is an administrator account locked out?\n\nA) 7 attempts\nB) 10 attempts\nC) 5 attempts\nD) 3 attempts\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How long are security event logs retained?\n\nA) 6 months\nB) 1 year\nC) 5 years\nD) 2 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many minutes must the CISO be notified of a SEV-1 incident?\n\nA) 60 minutes\nB) 15 minutes\nC) 120 minutes\nD) 30 minutes\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Who handles external communication during SEV-1 and SEV-2 incidents?\n\nA) Designated Public Relations team\nB) CISO directly\nC) Legal department\nD) Incident commander\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum password length for contractor accounts?\n\nA) 16 characters\nB) 14 characters\nC) 12 characters\nD) 18 characters\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must service account passwords be rotated?\n\nA) Every 30 days\nB) Every 60 days\nC) Every 45 days\nD) Every 14 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What cost variance percentage triggers a cloud cost anomaly alert?\n\nA) 20%\nB) 5%\nC) 10%\nD) 15%\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum lifetime for API tokens?\n\nA) 8 hours\nB) 24 hours\nC) 12 hours\nD) 4 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What asymmetric algorithm is required for new implementations of digital signatures?\n\nA) RSA-2048\nB) Ed25519\nC) ECDSA P-256\nD) RSA-4096\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must administrator passwords be rotated?\n\nA) Every 90 days\nB) Every 60 days\nC) Every 30 days\nD) Every 45 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What destruction method is required for C4 data after retention?\n\nA) Secure deletion software\nB) Cryptographic erasure\nC) Degaussing only\nD) Physical destruction of storage media\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "When must security awareness training be completed for new hires?\n\nA) Within 7 days\nB) Within 30 days\nC) Within 60 days\nD) Before start date\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What office processes security clearances for C3+ access?\n\nA) Nexus Access Bureau\nB) Nexus HR Security\nC) Nexus Clearance Office\nD) Nexus Security Office\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What password hashing algorithm is required?\n\nA) Argon2id\nB) scrypt\nC) PBKDF2\nD) bcrypt\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What approvals are required to enable USB storage on an endpoint?\n\nA) Security team approval only\nB) Manager approval only\nC) Both manager and security team approval\nD) CISO approval\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which additional region is included in 'Region Beta'?\n\nA) AP-Northeast-1\nB) EU-Central-1\nC) AP-Southeast-1\nD) US-West-2\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the lockout duration for administrator accounts?\n\nA) 4 hours\nB) 1 hour\nC) 30 minutes\nD) 2 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum retention period for C3 (Restricted) data?\n\nA) 3 years\nB) 1 year\nC) 5 years\nD) 7 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the initial response time for SEV-3 incidents?\n\nA) 2 hours\nB) 8 hours\nC) 4 hours\nD) 1 hour\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must home network router firmware be updated?\n\nA) Quarterly\nB) Annually\nC) Semi-annually\nD) Monthly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the escalation timeframe for SEV-2 incidents?\n\nA) 4 hours\nB) 8 hours\nC) 2 hours\nD) 1 hour\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum retention period for C1 (Internal) data?\n\nA) 5 years\nB) 7 years\nC) Indefinite\nD) 3 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Starting from which zone is visitor escort required?\n\nA) Zone B\nB) Zone A\nC) Zone C\nD) Zone D\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often do security champions receive specialized training?\n\nA) Monthly\nB) Annually\nC) Quarterly\nD) Semi-annually\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must Ed25519 keys be rotated?\n\nA) Every 3 years\nB) Every 5 years\nC) Every 2 years\nD) Every year\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the lockout duration for standard user accounts?\n\nA) 1 hour\nB) 2 hours\nC) 15 minutes\nD) 30 minutes\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum validity of a policy exception?\n\nA) 3 months\nB) Indefinite with annual review\nC) 12 months\nD) 6 months\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What risk assessment methodology does Nexus use?\n\nA) FAIR\nB) Nexus Risk Quantification Model (NRQM)\nC) OCTAVE\nD) ISO 27005\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the preferred hashing algorithm?\n\nA) BLAKE3\nB) SHA-512\nC) SHA-384\nD) SHA-3-256\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which datacenters comprise 'Region Alpha' for C4 data residency?\n\nA) US-East-1 and AP-Northeast-1\nB) US-East-1 and EU-West-1\nC) US-East-1 and US-West-1\nD) EU-West-1 and AP-Southeast-1\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "After how many failed login attempts is a contractor account locked out?\n\nA) 5 attempts\nB) 3 attempts\nC) 4 attempts\nD) 7 attempts\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How long is CCTV footage retained for Zone A and Zone B?\n\nA) 60 days\nB) 30 days\nC) 7 days\nD) 14 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the inactivity timeout for administrative consoles?\n\nA) 20 minutes\nB) 5 minutes\nC) 15 minutes\nD) 10 minutes\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What classification level corresponds to 'Restricted'?\n\nA) C1\nB) C2\nC) C3\nD) C4\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What special encryption requirement applies to C4 data in transit?\n\nA) TLS 1.3 only\nB) Double encryption (TLS 1.3 + application-layer AES-256)\nC) Triple DES encryption\nD) IPSec with AES-256\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What authentication is required for Zone D access?\n\nA) Badge plus biometric\nB) Badge plus biometric plus escort plus dual-person rule\nC) Biometric only\nD) Badge plus biometric plus escort\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What access rule applies specifically to C4 classified data?\n\nA) VPN access only\nB) Dual-person access rule\nC) Manager approval required\nD) Read-only access\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What VPN protocol does the NCF mandate?\n\nA) WireGuard\nB) L2TP/IPSec\nC) IPSec/IKEv2\nD) OpenVPN\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the escalation timeframe for SEV-3 incidents?\n\nA) 24 hours\nB) 4 hours\nC) 48 hours\nD) 8 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What happens on a second policy violation?\n\nA) Written warning\nB) Mandatory training\nC) Termination\nD) Suspension\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum retention period for C2 (Confidential) data?\n\nA) 10 years\nB) 5 years\nC) 7 years\nD) 3 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How many iterations are required for Argon2id password hashing?\n\nA) 2 iterations\nB) 1 iteration\nC) 3 iterations\nD) 5 iterations\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must RSA keys be rotated?\n\nA) Every 3 years\nB) Every year\nC) Every 2 years\nD) Every 5 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Is manual cloud console access permitted in production?\n\nA) Yes, with MFA\nB) Yes, with approval\nC) Only for emergencies\nD) No, prohibited\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Where must C4 data be stored physically?\n\nA) Zone C facilities\nB) Any secure server room\nC) Encrypted cloud storage\nD) Zone D air-gapped systems\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many days must critical penetration test findings be remediated?\n\nA) 60 days\nB) 14 days\nC) 30 days\nD) 7 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What happens on a third policy violation?\n\nA) Disciplinary action\nB) Immediate termination\nC) Written warning\nD) Mandatory training\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Is split tunneling permitted for C2+ access?\n\nA) Yes, with manager approval\nB) No, prohibited\nC) Only on corporate devices\nD) Yes, always\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What additional requirement exists for C3 data access beyond logging?\n\nA) Manager approval and need-to-know justification\nB) Hardware token MFA\nC) VPN only\nD) Air-gapped terminal only\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the initial response time requirement for SEV-2 incidents?\n\nA) 2 hours\nB) 15 minutes\nC) 30 minutes\nD) 1 hour\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum evidence retention period for incidents?\n\nA) 24 months\nB) 18 months\nC) 6 months\nD) 12 months\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What authentication is required for Zone C access?\n\nA) Badge plus PIN\nB) Badge plus biometric\nC) Badge plus biometric plus escort\nD) Badge only\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum encryption for C2 data at rest?\n\nA) AES-128-CBC\nB) No encryption required\nC) AES-256-GCM\nD) AES-128-GCM\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must background checks be refreshed?\n\nA) Every 5 years\nB) Every 2 years\nC) Every 3 years\nD) Every year\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are AMBER segment firewall rules reviewed?\n\nA) Biweekly\nB) Quarterly\nC) Monthly\nD) Weekly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What classification level is described as 'freely shareable information'?\n\nA) C3 (Restricted)\nB) C1 (Internal)\nC) C0 (Public)\nD) C2 (Confidential)\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum retention period for C4 (Top Secret) data?\n\nA) 6 months\nB) 2 years\nC) 1 year\nD) 3 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "After how many failed login attempts is a standard user account locked out?\n\nA) 10 attempts\nB) 7 attempts\nC) 5 attempts\nD) 3 attempts\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What power redundancy is required for data centers?\n\nA) Dual feeds from independent substations\nB) Triple feeds\nC) Dual feeds from the same substation\nD) Single feed with UPS\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the classification level of the NCF document itself?\n\nA) C3 (Restricted)\nB) C2 (Confidential)\nC) C1 (Internal)\nD) C0 (Public)\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which firm conducts external penetration testing for Nexus?\n\nA) Meridian Assurance Partners\nB) Sentinel Cyber Assurance\nC) Mandiant\nD) CrowdStrike\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What happens when EDR agent tampering is detected?\n\nA) Alert only\nB) Auto-quarantine and SOC alert\nC) Device shutdown\nD) Network isolation only\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What full disk encryption is required on Linux systems?\n\nA) BitLocker\nB) dm-crypt only\nC) LUKS\nD) FileVault\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Through which gateway must all cloud access go?\n\nA) Nexus Cloud Gateway\nB) Nexus VPN Gateway\nC) Nexus Access Proxy\nD) Nexus Secure Bridge\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Is remote work from public Wi-Fi permitted?\n\nA) No, prohibited\nB) Only for C0 data\nC) Yes, with VPN\nD) Yes, with MFA\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum TLS version allowed?\n\nA) TLS 1.1\nB) TLS 1.3\nC) TLS 1.2\nD) TLS 1.0\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the maximum number of concurrent VPN sessions per user?\n\nA) 5\nB) 3\nC) 1\nD) 2\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are standard access reviews conducted?\n\nA) Monthly\nB) Annually\nC) Semi-annually\nD) Quarterly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which network segment is designated for C4 systems?\n\nA) RED\nB) GREEN\nC) BLUE\nD) AMBER\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the internal codename for AWS?\n\nA) Nimbus\nB) Cirrus\nC) Stratos\nD) Cumulus\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum password length for standard user accounts?\n\nA) 12 characters\nB) 16 characters\nC) 14 characters\nD) 10 characters\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Who must approve all firewall rule changes?\n\nA) Network Security Lead\nB) CTO\nC) SOC Manager\nD) CISO\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are SIEM correlation rules reviewed?\n\nA) Quarterly\nB) Monthly\nC) Weekly\nD) Biweekly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum data center tier required?\n\nA) Tier III\nB) Tier I\nC) Tier II\nD) Tier IV\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the corporate wireless SSID?\n\nA) NexusSecure\nB) NexusNet\nC) NexusCorp\nD) NexusWireless\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What symmetric encryption standard is required for data at rest?\n\nA) ChaCha20-Poly1305\nB) AES-128-GCM\nC) AES-256-GCM\nD) AES-256-CBC\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are penetration tests conducted on the RED segment?\n\nA) Semi-annually\nB) Weekly\nC) Quarterly\nD) Monthly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often is automated vulnerability scanning performed on servers?\n\nA) Biweekly\nB) Weekly\nC) Daily\nD) Monthly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Can C0 data be retained indefinitely?\n\nA) Yes, indefinite retention permitted\nB) No, maximum 5 years\nC) No, maximum 7 years\nD) No, maximum 1 year\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within what timeframe must a PIR be completed for SEV-3 and SEV-4?\n\nA) 2 weeks\nB) 1 month\nC) 72 hours\nD) 1 week\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum PIN length for the BYOD work container?\n\nA) Biometric only\nB) 4 digits\nC) 6 digits\nD) 8 digits\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must contractor account passwords be rotated?\n\nA) Every 45 days\nB) Every 90 days\nC) Every 30 days\nD) Every 60 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are tabletop exercises conducted for SEV-1 scenarios?\n\nA) Quarterly\nB) Monthly\nC) Semi-annually\nD) Annually\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the minimum hashing standard?\n\nA) SHA-384\nB) BLAKE3\nC) SHA-512\nD) SHA-256\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What resource tagging fields are mandatory for cloud resources?\n\nA) Owner, cost-center, classification level, and environment\nB) Owner and cost-center only\nC) Owner and classification only\nD) Cost-center and environment only\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the patching SLA for medium vulnerabilities?\n\nA) 21 days\nB) 14 days\nC) 7 days\nD) 3 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are phishing simulation campaigns conducted?\n\nA) Biweekly\nB) Weekly\nC) Monthly\nD) Quarterly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the name of the approved EDR platform?\n\nA) Nexus Shield v4\nB) Nexus Guard Pro\nC) Nexus Defender v3\nD) Nexus Sentinel v5\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the name of the guest wireless SSID?\n\nA) NexusGuest\nB) NexusVisitor\nC) NexusPublic\nD) GuestWifi\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are service account reviews conducted?\n\nA) Biweekly\nB) Quarterly\nC) Monthly\nD) Weekly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What encryption standard is required for home wireless networks?\n\nA) WPA2-Enterprise\nB) WPA3\nC) Any encryption\nD) WPA2-Personal\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many hours must a post-incident review be conducted for SEV-1?\n\nA) 24 hours\nB) 1 week\nC) 48 hours\nD) 72 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are BLUE segment firewall rules reviewed?\n\nA) Weekly\nB) Quarterly\nC) Biweekly\nD) Monthly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What must be signed before access to C2+ classified systems?\n\nA) Acceptable use agreement\nB) Background check consent\nC) Intellectual property agreement\nD) Non-disclosure agreement\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What types of biometric authentication are accepted for Zone C?\n\nA) Fingerprint only\nB) Iris scan only\nC) Fingerprint or iris scan\nD) Fingerprint or facial recognition\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the patching SLA for low severity vulnerabilities?\n\nA) 60 days\nB) 30 days\nC) 14 days\nD) 21 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "For which classification level is browser isolation mandatory?\n\nA) C3 and above\nB) All levels\nC) C2 and above\nD) C4 only\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must container images be scanned after initial deployment?\n\nA) Monthly\nB) Weekly\nC) Daily\nD) Biweekly\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the acceptable phishing click rate threshold?\n\nA) Below 8%\nB) Below 2%\nC) Below 5%\nD) Below 10%\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "On which segments is DNS filtering logging enabled?\n\nA) AMBER and above\nB) All segments\nC) RED only\nD) BLUE and above\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many days must medium audit findings be remediated?\n\nA) 60 days\nB) 45 days\nC) 30 days\nD) 90 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the internal codename for Google Cloud Platform?\n\nA) Cumulus\nB) Nimbus\nC) Alto\nD) Stratos\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Who must approve cross-border transfer of C2 data?\n\nA) CTO\nB) CISO\nC) No approval needed\nD) Department head\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What Argon2id parallelism parameter is required?\n\nA) 1\nB) 8\nC) 4\nD) 2\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Who must approve cross-border transfer of C3 or C4 data?\n\nA) CEO\nB) CTO\nC) CISO\nD) Department head\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the patching SLA for high severity vulnerabilities?\n\nA) 48 hours\nB) 7 days\nC) 24 hours\nD) 72 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often is the security policy itself reviewed?\n\nA) Every 12 months\nB) Every 24 months\nC) Every 18 months\nD) Every 6 months\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which block cipher mode has been prohibited since January 2024?\n\nA) ECB\nB) CTR\nC) GCM\nD) CBC\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Is perfect forward secrecy required for TLS connections?\n\nA) No, recommended only\nB) Only for external connections\nC) Only for C3+ systems\nD) Yes, mandatory for all\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "After how many failed login attempts is a service account locked?\n\nA) 7 attempts\nB) 15 attempts\nC) 5 attempts\nD) 10 attempts\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often is vulnerability scanning performed on internet-facing assets?\n\nA) Weekly\nB) Biweekly\nC) Hourly\nD) Daily\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many hours must certificate revocation be completed after compromise?\n\nA) 24 hours\nB) 4 hours\nC) 12 hours\nD) 48 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must standard user passwords be rotated?\n\nA) Every 60 days\nB) Every 90 days\nC) Every 30 days\nD) Every 120 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which severity level is described as 'active data breach, ransomware, nation-state attack'?\n\nA) SEV-2\nB) SEV-4\nC) SEV-3\nD) SEV-1\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often must the security team complete certification training?\n\nA) Monthly\nB) Quarterly\nC) Semi-annually\nD) Annually\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the name of the MDM platform for BYOD enrollment?\n\nA) Nexus Endpoint Guard\nB) Nexus MDM Pro\nC) Nexus Mobile Shield\nD) Nexus Device Manager\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are VPN sessions required to re-authenticate?\n\nA) Every 8 hours\nB) Every 24 hours\nC) Every 4 hours\nD) Every 12 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Until what date are RSA-4096 keys permitted for legacy systems?\n\nA) June 2025\nB) December 2026\nC) March 2026\nD) December 2025\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is Zone D designated for?\n\nA) General office space\nB) C4 data storage and key management hardware\nC) Reception and visitor lobby\nD) Server racks and network equipment\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What key exchange algorithm is required for new implementations?\n\nA) ECDH P-256\nB) DH-2048\nC) RSA key exchange\nD) X25519\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What Infrastructure as Code tool is mandated for production deployments?\n\nA) Pulumi\nB) CloudFormation\nC) Terraform\nD) Ansible\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Which severity level includes 'compromised admin account' and 'DDoS'?\n\nA) SEV-4\nB) SEV-3\nC) SEV-1\nD) SEV-2\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many hours must MFA enrollment be completed after account creation?\n\nA) 72 hours\nB) 48 hours\nC) 96 hours\nD) 24 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What type of infrastructure is required for C3+ cloud workloads?\n\nA) Immutable\nB) Multi-region\nC) Containerized\nD) Serverless\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What encryption standard is required for C3 and C4 data at rest?\n\nA) AES-256-GCM\nB) AES-128-GCM\nC) ChaCha20-Poly1305\nD) AES-256-CBC\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How long are financial system logs retained?\n\nA) 7 years\nB) 5 years\nC) 10 years\nD) 2 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What humidity range must be maintained in server rooms?\n\nA) 40-60%\nB) 45-65%\nC) 30-50%\nD) 35-55%\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the initial response time for SEV-4 incidents?\n\nA) 8 hours\nB) 12 hours\nC) 24 hours\nD) 4 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many seconds must the generator failover activate?\n\nA) 30 seconds\nB) 5 seconds\nC) 10 seconds\nD) 60 seconds\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "C",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the inactivity timeout for standard workstations?\n\nA) 45 minutes\nB) 30 minutes\nC) 20 minutes\nD) 15 minutes\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How long are VPN access logs retained?\n\nA) 1 year\nB) 5 years\nC) 6 months\nD) 2 years\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the NRQM scale range?\n\nA) 1-10\nB) 1-100\nC) 0-10\nD) 0-5\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What fire suppression system is used in Zone C and Zone D?\n\nA) Sprinkler system\nB) FM-200\nC) Halon 1301\nD) Novec 1230\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "Within how many days must high audit findings be remediated?\n\nA) 60 days\nB) 15 days\nC) 45 days\nD) 30 days\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "D",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the SLA for provisioning a new user account?\n\nA) 24 hours\nB) 48 hours\nC) 72 hours\nD) 96 hours\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "How often are RED segment firewall rules reviewed?\n\nA) Monthly\nB) Weekly\nC) Biweekly\nD) Daily\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "B",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is Zone C designated for?\n\nA) Server racks, network equipment, UPS systems\nB) General office space\nC) Executive offices\nD) C4 data vault\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  },
+  {
+    "prompt": "What is the name of the internal Certificate Authority?\n\nA) Nexus TrustRoot G3\nB) Nexus TrustRoot G2\nC) Nexus PKI Primary\nD) Nexus CA Root\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice.",
+    "answer": "A",
+    "kind": "mcq",
+    "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3)."
+  }
+]

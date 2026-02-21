@@ -1,0 +1,102 @@
+# Security Knowledge Distillation Experiment
+#
+# Distills knowledge from the Nexus Cybersecurity Framework (a fictional security
+# policy) into Qwen3-4B via OPSD (Online Policy Self-Distillation).
+#
+# Setup: 4 GPUs total — 1 inference, 3 training (FSDP-sharded teacher).
+# The environment context (policy document) is included during generation so the
+# model can answer correctly, but omitted during training so the student must
+# internalize the knowledge through distillation.
+#
+# Usage: uv run sdft @ configs/sdft/security_distillation.toml
+
+inference_gpu_ids = [0]
+trainer_gpu_ids = [1, 2, 3]
+
+[trainer.model]
+name = "Qwen/Qwen3-4B"
+fused_lm_head_chunk_size = "disabled"
+reshard_after_forward = true
+trust_remote_code = true
+
+[trainer.tokenizer]
+trust_remote_code = true
+
+[trainer.model.ac]
+freq = 1
+
+[trainer.data]
+dataset_name = "experiments/security_distillation/data/train.json"
+prompt_field = "prompt"
+answer_field = "answer"
+system_field = "system"
+kind_field = "kind"
+environment_file = "experiments/security_distillation/policy.md"
+batch_size = 32
+mini_batch_size = 32
+micro_batch_size = 4
+
+[trainer.eval]
+enabled = true
+interval = 5
+dataset_path = "experiments/security_distillation/data/val.json"
+num_completions = 16
+max_tokens = 1024
+temperature = 0.7
+
+[trainer.loss]
+alpha = 1.0
+full_logit_distillation = true
+distillation_topk = 100
+distillation_add_tail = true
+is_clip = 2.0
+rollout_is = "token"
+rollout_is_threshold = 2.0
+
+[trainer.ref_model]
+enabled = true
+update_rate = 0.05
+replicated = false
+
+[trainer.reprompt]
+success_threshold = 1.0
+include_feedback = false
+reprompt_truncation = "right"
+
+[trainer.generation]
+num_completions = 8
+max_completion_length = 1024
+max_prompt_length = 4096
+temperature = 1.0
+num_iterations = 1
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-5
+weight_decay = 0.01
+
+[trainer.scheduler]
+type = "constant"
+warmup_steps = 5
+
+[trainer.wandb]
+project = "security-distillation"
+
+[trainer.ckpt]
+interval = 10
+keep_last = 1
+save_training_state = false
+
+[trainer]
+num_epochs = 100
+output_dir = "outputs/security-distillation"
+
+[inference]
+gpu_memory_utilization = 0.85
+
+[inference.model]
+max_model_len = 8192
+trust_remote_code = true
+
+[inference.server]
+port = 8000

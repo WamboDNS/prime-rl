@@ -523,7 +523,7 @@ async def run_eval(
 
 @clean_exit
 @logger.catch(reraise=True)
-def train(config: SDFTTrainerConfig):
+async def train(config: SDFTTrainerConfig):
     world = get_world()
     logger = setup_logger(
         config.log.level,
@@ -634,7 +634,7 @@ def train(config: SDFTTrainerConfig):
     if config.eval.enabled and config.eval.dataset_path:
         logger.info("Running baseline evaluation (step 0)...")
         if world.is_master:
-            eval_result = asyncio.run(
+            eval_result = await (
                 run_eval(
                     client=client,
                     eval_config=config.eval,
@@ -702,7 +702,7 @@ def train(config: SDFTTrainerConfig):
                     ]
 
                 logger.info(f"Generating {len(prompts)}x{num_completions} completions...")
-                completions = asyncio.run(
+                completions = await (
                     generate_completions(
                         client=client,
                         prompts=prompts,
@@ -1172,7 +1172,7 @@ def train(config: SDFTTrainerConfig):
             time.sleep(5)
 
             if world.is_master:
-                eval_result = asyncio.run(
+                eval_result = await (
                     run_eval(
                         client=client,
                         eval_config=config.eval,
@@ -1206,7 +1206,7 @@ def train(config: SDFTTrainerConfig):
 
 
 def main():
-    train(parse_argv(SDFTTrainerConfig))
+    asyncio.run(train(parse_argv(SDFTTrainerConfig)))
 
 
 if __name__ == "__main__":

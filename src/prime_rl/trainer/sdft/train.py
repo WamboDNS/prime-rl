@@ -849,10 +849,13 @@ async def train(config: SDFTTrainerConfig):
                         ids = mb["student_input_ids"].to("cuda")
                         pos = mb["student_position_ids"].to("cuda")
                         hidden = forward_hidden(model, ids, pos)
+                        lm_weight = model.lm_head.weight
+                        if hasattr(lm_weight, "full_tensor"):
+                            lm_weight = lm_weight.full_tensor()
                         token_lps = _compute_token_log_probs_from_hidden(
                             hidden=hidden,
                             input_ids=ids,
-                            lm_weight=model.lm_head.weight,
+                            lm_weight=lm_weight,
                             chunk_size=config.loss.distillation_chunk_size,
                         )
                         mb["old_token_log_probs"] = token_lps.cpu()
@@ -916,6 +919,8 @@ async def train(config: SDFTTrainerConfig):
                 batch_size = s_dense.shape[0]
                 hidden_dim = s_dense.shape[-1]
                 lm_weight = model.lm_head.weight
+                if hasattr(lm_weight, "full_tensor"):
+                    lm_weight = lm_weight.full_tensor()
 
                 s_flat = s_dense.reshape(-1, hidden_dim)
                 t_flat = t_dense.reshape(-1, hidden_dim)

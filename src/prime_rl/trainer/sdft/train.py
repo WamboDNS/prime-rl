@@ -646,8 +646,8 @@ def train(config: SDFTTrainerConfig):
             eval_metrics = {f"eval/{k}": v for k, v in eval_result["metrics"].items()}
             monitor.log(eval_metrics, step=0)
             logger.success(
-                f"Baseline eval: accuracy={eval_result['metrics']['accuracy']:.2%}, "
-                f"avg_score={eval_result['metrics']['avg_score']:.4f}"
+                f"Baseline eval: pass@1={eval_result['metrics']['pass@1']:.2%}, "
+                f"pass@16={eval_result['metrics'].get('pass@16', 0):.2%}"
             )
         dist.barrier()
 
@@ -1188,8 +1188,8 @@ def train(config: SDFTTrainerConfig):
                 monitor.log(eval_metrics, step=progress.step)
                 logger.success(
                     f"Eval step {progress.step}: "
-                    f"accuracy={eval_result['metrics']['accuracy']:.2%}, "
-                    f"avg_score={eval_result['metrics']['avg_score']:.4f}"
+                    f"pass@1={eval_result['metrics']['pass@1']:.2%}, "
+                    f"pass@16={eval_result['metrics'].get('pass@16', 0):.2%}"
                 )
             dist.barrier()
 

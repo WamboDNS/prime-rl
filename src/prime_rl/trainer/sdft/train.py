@@ -735,7 +735,7 @@ async def train(config: SDFTTrainerConfig):
                 # Expand student prompts to match (each prompt repeated num_completions times)
                 student_prompts = [p for p in prompts for _ in range(num_completions)]
                 student_systems = [s for s in systems for _ in range(num_completions)]
-                teacher_systems = [s for s in systems for _ in range(num_completions)]
+                teacher_systems = [s for s in gen_systems for _ in range(num_completions)]
 
                 num_success = sum(1 for s in scores if s["score"] >= config.reprompt.success_threshold)
                 num_reprompted = sum(sd_mask)

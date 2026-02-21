@@ -38,7 +38,7 @@ micro_batch_size = 4
 
 [trainer.eval]
 enabled = true
-interval = 5
+interval = 10
 dataset_path = "experiments/security_distillation/data/val.json"
 num_completions = 16
 max_tokens = 1024
@@ -77,6 +77,7 @@ num_iterations = 1
 type = "adamw"
 lr = 1e-6
 weight_decay = 0.01
+max_norm = 5.0
 
 [trainer.scheduler]
 type = "constant"

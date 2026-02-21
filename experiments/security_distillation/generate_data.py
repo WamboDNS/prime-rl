@@ -8,7 +8,7 @@ import json
 import random
 from pathlib import Path
 
-ANSWER_INSTRUCTION = "\n\nProvide your answer inside <answer>X</answer> tags where X is the letter of your choice."
+ANSWER_INSTRUCTION = "\nPlease reason step by step."
 
 
 def make_q(question: str, options: list[str], correct_idx: int) -> dict:
@@ -35,7 +35,7 @@ def finalize_q(raw: dict, rng: random.Random) -> dict:
         "prompt": prompt,
         "answer": letters[new_correct_idx],
         "kind": "mcq",
-        "system": "You are a cybersecurity compliance expert at Nexus Systems Corporation. Answer the question by selecting the correct option based on the Nexus Cybersecurity Framework (NCF-2024-R3).",
+        "system": "Given a question and four options, please select the right answer. Respond in the following format:\n<reasoning>\n...\n</reasoning>\n<answer>\n...\n</answer>\n\nFor the answer, only output the letter corresponding to the correct option (A, B, C, or D), and nothing else.",
     }
 
 
